@@ -195,6 +195,16 @@ a{color:var(--tint)}
 .side-box h3{margin:0;font:600 13px/1.3 var(--font-display)}
 .side-box p{margin:0;color:var(--muted);font-size:12px}
 .side-box .row{display:flex;gap:6px;flex-wrap:wrap}
+.guardado{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ink-2)}
+.guardado-fila{display:flex;gap:8px;align-items:flex-start;line-height:1.35}
+.guardado-fila small{display:block}
+.guardado-error{color:var(--bad);word-break:break-word}
+.dot-estado{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--otro)}
+.dot-estado.bien{background:var(--ok)}
+.dot-estado.mal{background:var(--bad)}
+.dot-estado.espera{background:var(--warn)}
+.hero-nube{margin:18px 0 0;max-width:420px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.hero-nube .sub{margin:0;font-size:12px;color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:2px 8px}
 .pill-warn{background:var(--warn-soft);color:var(--warn)}
 .pill-ok{background:var(--ok-soft);color:var(--ok)}
@@ -423,7 +433,7 @@ input[type=range]{width:100%;accent-color:var(--tint)}
    ===================================================================== */
 .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.32);display:grid;place-items:center;z-index:50;padding:16px;
   animation:fadeIn 180ms ease-out}
-.modal{width:min(460px,100%);background:var(--surface);border-radius:20px;box-shadow:var(--shadow-pop);padding:22px;
+.modal{width:min(460px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;background:var(--surface);border-radius:20px;box-shadow:var(--shadow-pop);padding:22px;
   animation:popIn 220ms var(--ease-out)}
 .modal h2{margin:0 0 4px;font:600 19px/1.25 var(--font-display);overflow-wrap:anywhere}
 .modal > p{margin:0 0 16px;color:var(--muted);font-size:13px;overflow-wrap:anywhere}
@@ -972,8 +982,8 @@ async function derivarLlave(clave, salt, iter) {
   return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 
-async function armarJsonRevisiones(decisiones, clave, por, compras) {
-  const cuerpo = { decisiones, compras }; // compras = presupuesto, catálogo y plan de compra
+async function armarJsonRevisiones(decisiones, clave, por, compras, extra = {}) {
+  const cuerpo = { decisiones, compras, ...extra }; // compras = presupuesto, catálogo y plan de compra; extra = Excel leído (solo en la copia de GitHub)
   const meta = { tipo: 'regalos-navidad-revisiones', version: 1, anio: CONFIG.anio, generado: new Date().toISOString(), por: por || '' };
   if (!clave) return JSON.stringify({ ...meta, cifrado: false, ...cuerpo }, null, 1);
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -988,13 +998,13 @@ async function abrirJsonRevisiones(textoJson, clave) {
   try { j = JSON.parse(textoJson); } catch (e) { throw new Error('El archivo no es un JSON válido.'); }
   if (j.tipo !== 'regalos-navidad-revisiones') throw new Error('Este JSON no es un archivo de revisiones de esta herramienta.');
   // Devuelve { decisiones, compras } (los archivos viejos no traen compras)
-  if (!j.cifrado) return { decisiones: j.decisiones || {}, compras: j.compras || null };
+  if (!j.cifrado) return { decisiones: j.decisiones || {}, compras: j.compras || null, datos: j.datos || null, fechaEntrega: j.fechaEntrega || null };
   if (!clave) { const e = new Error('Este archivo tiene clave.'); e.necesitaClave = true; throw e; }
   try {
     const llave = await derivarLlave(clave, deB64(j.salt), j.iter || CONFIG.iteracionesClave);
     const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64(j.iv) }, llave, deB64(j.datos));
     const cuerpo = JSON.parse(dec.decode(plano));
-    return { decisiones: cuerpo.decisiones || {}, compras: cuerpo.compras || null };
+    return { decisiones: cuerpo.decisiones || {}, compras: cuerpo.compras || null, datos: cuerpo.datos || null, fechaEntrega: cuerpo.fechaEntrega || null };
   } catch (e) {
     const err = new Error('La clave no es correcta.'); err.necesitaClave = true; err.claveMala = true; throw err;
   }
@@ -1009,6 +1019,93 @@ function fusionarDecisiones(actual, nuevas) {
     if (!out[k] || (out[k].fecha || '') < d.fecha) { out[k] = d; cambios++; }
   }
   return { decisiones: out, cambios };
+}
+
+/* =====================================================================
+   5b. GUARDADO AUTOMÁTICO
+   a) En este equipo (IndexedDB del navegador): Excel ya leído, revisiones,
+      plan de compra y fecha de entrega. Se guarda solo con cada cambio y
+      se recupera al volver a abrir la página.
+   b) Copia en GitHub (opcional): el mismo contenido, SIEMPRE cifrado con
+      la clave del equipo (AES-GCM, igual que el JSON), se sube solo unos
+      segundos después de cada cambio a un archivo del repositorio
+      (por defecto rama "respaldos", para no tocar la página publicada).
+      GitHub guarda el historial de cada versión. Si otra persona subió
+      cambios, se juntan (gana la decisión más reciente por niño).
+   ===================================================================== */
+const IDB = { db: 'regalos' + CONFIG.anio, store: 'kv' };
+function idbAbrir() {
+  return new Promise((ok, mal) => {
+    const r = indexedDB.open(IDB.db, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(IDB.store);
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => mal(r.error);
+  });
+}
+async function idbLeer(k) {
+  try {
+    const db = await idbAbrir();
+    return await new Promise((ok, mal) => { const q = db.transaction(IDB.store).objectStore(IDB.store).get(k); q.onsuccess = () => ok(q.result); q.onerror = () => mal(q.error); });
+  } catch (e) { return undefined; }
+}
+async function idbGuardar(k, v) {
+  const db = await idbAbrir();
+  await new Promise((ok, mal) => { const t = db.transaction(IDB.store, 'readwrite'); t.objectStore(IDB.store).put(v, k); t.oncomplete = ok; t.onerror = () => mal(t.error); });
+}
+async function idbBorrar(k) {
+  try { const db = await idbAbrir(); await new Promise((ok) => { const t = db.transaction(IDB.store, 'readwrite'); t.objectStore(IDB.store).delete(k); t.oncomplete = ok; t.onerror = ok; }); } catch (e) { /* nada */ }
+}
+// Pide al navegador que no borre estos datos cuando le falte espacio
+function pedirAlmacenamientoPersistente() { try { navigator.storage?.persist?.(); } catch (e) { /* no soportado */ } }
+
+// Junta el estado de aquí con el de la copia: por niño gana la decisión más reciente;
+// para el Excel y el plan de compra gana el más reciente.
+function fusionarEstado(local, remoto) {
+  const r = remoto || {};
+  const datos = !local.datos ? (r.datos || null) : (r.datos && (r.datos.fecha || '') > (local.datos.fecha || '') ? r.datos : local.datos);
+  const compras = r.compras && r.compras.catalogo && (r.compras.fecha || '') > (local.compras?.fecha || '') ? { ...comprasIniciales(), ...r.compras } : local.compras;
+  const fechaEntrega = datos === local.datos ? local.fechaEntrega : (r.fechaEntrega || local.fechaEntrega);
+  return { datos, compras, fechaEntrega, decisiones: fusionarDecisiones(local.decisiones, r.decisiones).decisiones };
+}
+
+const GH_POR_DEFECTO = { token: '', repo: 'FelipeAnali/Jueguete', rama: 'respaldos', ruta: `respaldos/regalos${CONFIG.anio}.json`, recordarClave: false, clave: '' };
+function urlGh(cfg) { return `https://api.github.com/repos/${cfg.repo.trim()}/contents/${cfg.ruta.trim().split('/').map(encodeURIComponent).join('/')}`; }
+function cabecerasGh(cfg, accept = 'application/vnd.github+json') { return { Authorization: `Bearer ${cfg.token.trim()}`, Accept: accept, 'X-GitHub-Api-Version': '2022-11-28' }; }
+async function errorGh(r) {
+  let m = ''; try { m = (await r.json()).message || ''; } catch (e) { /* sin cuerpo */ }
+  const txt = r.status === 401 ? 'El token de GitHub no sirve o venció.'
+    : r.status === 403 ? 'El token no tiene permiso para escribir en ese repositorio (Contents: Read and write).'
+    : r.status === 404 ? 'No encontré el repositorio o la rama. Revisa el nombre y que el token tenga acceso.'
+    : `GitHub respondió ${r.status}${m ? ': ' + m : ''}`;
+  const e = new Error(txt); e.status = r.status; return e;
+}
+// Lee la copia. Devuelve null si todavía no existe.
+async function ghLeer(cfg) {
+  const url = `${urlGh(cfg)}?ref=${encodeURIComponent(cfg.rama.trim())}&t=${Date.now()}`;
+  const r = await fetch(url, { headers: cabecerasGh(cfg), cache: 'no-store' });
+  if (r.status === 404) {
+    // ¿No existe el archivo o no existe el repo/rama? Se distingue mirando la rama.
+    const rb = await fetch(`https://api.github.com/repos/${cfg.repo.trim()}/branches/${encodeURIComponent(cfg.rama.trim())}`, { headers: cabecerasGh(cfg), cache: 'no-store' });
+    if (rb.ok) return null;
+    throw await errorGh(rb);
+  }
+  if (!r.ok) throw await errorGh(r);
+  const j = await r.json();
+  let texto;
+  if (j.encoding === 'base64' && j.content) texto = dec.decode(deB64(j.content.replace(/\n/g, '')));
+  else { // archivos grandes (más de 1 MB) se piden en crudo
+    const rr = await fetch(url, { headers: cabecerasGh(cfg, 'application/vnd.github.raw'), cache: 'no-store' });
+    if (!rr.ok) throw await errorGh(rr);
+    texto = await rr.text();
+  }
+  return { sha: j.sha, texto };
+}
+async function ghEscribir(cfg, texto, sha) {
+  const cuerpo = { message: `Respaldo regalos ${CONFIG.anio} · ${new Date().toLocaleString('es-CO')}`, content: aB64(enc.encode(texto)), branch: cfg.rama.trim() };
+  if (sha) cuerpo.sha = sha;
+  const r = await fetch(urlGh(cfg), { method: 'PUT', headers: { ...cabecerasGh(cfg), 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+  if (!r.ok) throw await errorGh(r);
+  return (await r.json()).content.sha;
 }
 
 /* =====================================================================
@@ -1746,7 +1843,7 @@ function App() {
   const [fechaEntrega, setFechaEntrega] = useState(CONFIG.fechaEntregaPorDefecto);
   const [sede, setSede] = useState('');                   // '' = todas las sedes
   const [vista, setVista] = useState('resumen');
-  const [decisiones, setDecisiones] = useState({});       // revisiones en memoria (NO se guardan en el navegador)
+  const [decisiones, setDecisiones] = useState({});       // revisiones (se guardan solas en este equipo y en la copia de GitHub)
   const [sinGuardar, setSinGuardar] = useState(0);        // cuántas revisiones no se han descargado
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState('');
@@ -1763,14 +1860,132 @@ function App() {
   const logo = useRef(null);
   const inputJson = useRef(null);
 
+  // ---------- Guardado en este equipo (IndexedDB)
+  const [cargadoLocal, setCargadoLocal] = useState(false); // no se guarda nada hasta terminar de leer lo guardado
+  const [guardadoLocal, setGuardadoLocal] = useState('');   // fecha del último guardado aquí, o 'error'
+  const aplicarEstado = (e) => {
+    if (e.datos !== undefined) setDatos(e.datos);
+    if (e.decisiones) setDecisiones(e.decisiones);
+    if (e.compras && e.compras.catalogo) setCompras({ ...comprasIniciales(), ...e.compras });
+    if (e.fechaEntrega) setFechaEntrega(e.fechaEntrega);
+  };
+  useEffect(() => {
+    pedirAlmacenamientoPersistente();
+    idbLeer('estado').then((g) => {
+      if (g) aplicarEstado({ datos: g.datos || null, decisiones: g.decisiones || {}, compras: g.compras, fechaEntrega: g.fechaEntrega });
+      setCargadoLocal(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (!cargadoLocal) return;
+    const t = setTimeout(() => {
+      idbGuardar('estado', { datos, decisiones, compras, fechaEntrega, guardado: new Date().toISOString() })
+        .then(() => setGuardadoLocal(new Date().toISOString()))
+        .catch(() => setGuardadoLocal('error'));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [cargadoLocal, datos, decisiones, compras, fechaEntrega]);
+
+  // ---------- Copia en GitHub
+  const [gh, setGh] = useState(() => { try { return { ...GH_POR_DEFECTO, ...JSON.parse(leerLocal('regalos2026.github', '{}')) }; } catch (e) { return { ...GH_POR_DEFECTO }; } });
+  const [claveNube, setClaveNube] = useState(() => (gh.recordarClave ? gh.clave || '' : ''));
+  const [nube, setNube] = useState({ estado: 'off', fecha: '', msg: '' }); // off | falta-clave | pendiente | subiendo | ok | error
+  const nubeActiva = !!(gh.token && gh.repo && claveNube);
+  const shaNube = useRef(null);       // versión de la copia que ya conocemos
+  const ultimoSubido = useRef('');    // contenido (sin cifrar) que ya está igual en GitHub
+  const estadoRef = useRef({});
+  estadoRef.current = { datos, decisiones, compras, fechaEntrega };
+  const textoEstado = (e) => JSON.stringify([e.datos || null, e.decisiones || {}, e.compras || null, e.fechaEntrega || null]);
+  const enCurso = useRef(false);
+
+  // Trae la copia de GitHub y la junta con lo de aquí. Devuelve el estado juntado.
+  const bajarNube = async (cfg = gh, clave = claveNube) => {
+    const remota = await ghLeer(cfg);
+    if (!remota) { shaNube.current = null; return { estado: estadoRef.current, existe: false }; }
+    const abierto = await abrirJsonRevisiones(remota.texto, clave);
+    const junto = fusionarEstado(estadoRef.current, abierto);
+    shaNube.current = remota.sha;
+    if (textoEstado(junto) !== textoEstado(estadoRef.current)) { estadoRef.current = junto; aplicarEstado(junto); }
+    // Si lo de aquí no trae nada nuevo, no hace falta volver a subir
+    const remotoNorm = { datos: abierto.datos, decisiones: abierto.decisiones, compras: abierto.compras && abierto.compras.catalogo ? { ...comprasIniciales(), ...abierto.compras } : null, fechaEntrega: abierto.fechaEntrega };
+    if (textoEstado(junto) === textoEstado(remotoNorm)) ultimoSubido.current = textoEstado(junto);
+    return { estado: junto, existe: true };
+  };
+  const subirNube = async (forzar = false) => {
+    if (!nubeActiva || enCurso.current) return;
+    if (!estadoRef.current.datos && !Object.keys(estadoRef.current.decisiones || {}).length) return; // nada que respaldar todavía
+    if (!forzar && textoEstado(estadoRef.current) === ultimoSubido.current) { setNube((n) => ({ ...n, estado: 'ok' })); return; }
+    enCurso.current = true;
+    setNube((n) => ({ ...n, estado: 'subiendo', msg: '' }));
+    try {
+      for (let intento = 0; intento < 3; intento++) {
+        const { estado: e } = await bajarNube(); // primero se juntan los cambios de los demás
+        if (!forzar && textoEstado(e) === ultimoSubido.current) { setNube({ estado: 'ok', fecha: new Date().toISOString(), msg: '' }); break; }
+        const txt = await armarJsonRevisiones(e.decisiones, claveNube, revisor, e.compras, { datos: e.datos, fechaEntrega: e.fechaEntrega });
+        try {
+          shaNube.current = await ghEscribir(gh, txt, shaNube.current);
+          ultimoSubido.current = textoEstado(e);
+          setNube({ estado: 'ok', fecha: new Date().toISOString(), msg: '' });
+          break;
+        } catch (err) {
+          if ((err.status === 409 || err.status === 422) && intento < 2) continue; // otra persona subió justo antes: se vuelve a juntar
+          throw err;
+        }
+      }
+    } catch (err) {
+      setNube((n) => ({ ...n, estado: 'error', msg: err.message || String(err) }));
+    }
+    enCurso.current = false;
+  };
+  // Al abrir la página (o al conectar): trae la copia de GitHub
+  useEffect(() => {
+    if (!cargadoLocal) return;
+    if (!gh.token) { setNube({ estado: 'off', fecha: '', msg: '' }); return; }
+    if (!claveNube) { setNube({ estado: 'falta-clave', fecha: '', msg: '' }); return; }
+    enCurso.current = true;
+    setNube((n) => ({ ...n, estado: 'subiendo', msg: '' }));
+    bajarNube().then(({ existe }) => { setNube({ estado: 'ok', fecha: existe ? new Date().toISOString() : '', msg: '' }); })
+      .catch((err) => setNube({ estado: 'error', fecha: '', msg: err.message || String(err) }))
+      .finally(() => { enCurso.current = false; });
+  }, [cargadoLocal, gh.token, gh.repo, gh.rama, gh.ruta, claveNube]);
+  // Sube la copia unos segundos después de cada cambio
+  useEffect(() => {
+    if (!cargadoLocal || !nubeActiva) return;
+    if (textoEstado(estadoRef.current) === ultimoSubido.current) return;
+    setNube((n) => (n.estado === 'error' || n.estado === 'subiendo' ? n : { ...n, estado: 'pendiente' }));
+    const t = setTimeout(() => subirNube(), 6000);
+    return () => clearTimeout(t);
+  }, [cargadoLocal, nubeActiva, datos, decisiones, compras, fechaEntrega, nube.estado === 'ok']);
+  // Revisa cada 2 minutos si otra persona subió cambios
+  useEffect(() => {
+    if (!nubeActiva) return;
+    const t = setInterval(() => { if (!enCurso.current && document.visibilityState === 'visible') bajarNube().catch(() => {}); }, 120000);
+    return () => clearInterval(t);
+  }, [nubeActiva, gh, claveNube]);
+  const guardarConfigGh = (cfg, clave) => {
+    const g = { ...cfg, clave: cfg.recordarClave ? clave : '' };
+    guardarLocal('regalos2026.github', JSON.stringify(g));
+    shaNube.current = null; ultimoSubido.current = '';
+    setGh(g); setClaveNube(clave); setModal(null);
+    setToast('Copia en GitHub conectada');
+  };
+  const desconectarGh = () => { const g = { ...gh, token: '', clave: '' }; guardarLocal('regalos2026.github', JSON.stringify(g)); setGh(g); setClaveNube(''); setModal(null); setToast('GitHub desconectado en este equipo'); };
+  const borrarEsteEquipo = async () => {
+    if (!confirm('¿Borrar de este equipo el Excel, las revisiones y la conexión a GitHub? La copia que está en GitHub NO se borra.')) return;
+    await idbBorrar('estado');
+    try { localStorage.removeItem('regalos2026.compras'); localStorage.removeItem('regalos2026.github'); } catch (e) { /* nada */ }
+    location.reload();
+  };
+  const pendienteNube = nubeActiva && (nube.estado === 'pendiente' || nube.estado === 'subiendo');
+
   useEffect(() => { cargarLogo().then((l) => { logo.current = l; }); }, []);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3200); return () => clearTimeout(t); } }, [toast]);
-  // Aviso al cerrar la pestaña si hay revisiones sin descargar
+  // Aviso al cerrar la pestaña si la copia de GitHub todavía no se ha subido
   useEffect(() => {
-    const h = (e) => { if (sinGuardar) { e.preventDefault(); e.returnValue = ''; } };
+    const h = (e) => { if (pendienteNube) { e.preventDefault(); e.returnValue = ''; } };
     window.addEventListener('beforeunload', h);
     return () => window.removeEventListener('beforeunload', h);
-  }, [sinGuardar]);
+  }, [pendienteNube]);
 
   const datosActivos = useMemo(() => (fuenteDev === 'real' ? datos : generarDev(fuenteDev)), [fuenteDev, datos]);
   const listo = datosActivos && datosActivos.respuestas && datosActivos.maestro;
@@ -1809,9 +2024,10 @@ function App() {
       const nuevo = await leerArchivos(files);
       if (!nuevo.respuestas && !nuevo.maestro) throw new Error('No encontré ni las respuestas del Forms ni el maestro en ese archivo. Revisa que tenga la hoja de respuestas (con “Numero de Documento” y columnas “(Hijo 1)”) y la hoja del maestro (con “Empleado” y “Nombre del empleado”).');
       setDatos((prev) => {
-        if (nuevo.respuestas && nuevo.maestro) return nuevo;
+        const fecha = new Date().toISOString(); // para saber cuál Excel es el más reciente al juntar copias
+        if (nuevo.respuestas && nuevo.maestro) return { ...nuevo, fecha };
         // Si solo trae una parte, se completa con lo que ya estaba cargado
-        return { respuestas: nuevo.respuestas || prev?.respuestas || null, maestro: nuevo.maestro || prev?.maestro || null, archivos: [...(prev?.archivos || []), ...nuevo.archivos] };
+        return { respuestas: nuevo.respuestas || prev?.respuestas || null, maestro: nuevo.maestro || prev?.maestro || null, archivos: [...(prev?.archivos || []), ...nuevo.archivos], fecha };
       });
       setFuenteDev('real');
       setToast(`Leído: ${files.map((f) => f.name).join(', ')}`);
@@ -1904,6 +2120,7 @@ function App() {
   };
 
   // ---------- Pantalla inicial (sin datos)
+  if (!cargadoLocal) return <Ocupado texto="Abriendo lo guardado…" />;
   if (!listo) {
     const falta = datosActivos && (!datosActivos.respuestas ? 'las respuestas del Forms' : 'el maestro de personal');
     return (
@@ -1922,8 +2139,14 @@ function App() {
             <li><Icono.check />Una hoja con las respuestas del Forms tal como salen (columnas “Numero de Documento” y los bloques “(Hijo 1)” a “(Hijo 6)”).</li>
             <li><Icono.check />Una hoja con el maestro de personal activo (columnas “Empleado”, “Nombre del empleado”, “Descripcion C.O.”).</li>
           </ul>
-          <p className="privacy"><Icono.lock />El archivo se lee aquí mismo, en tu navegador. No se sube a ningún servidor y al cerrar la pestaña no queda nada guardado.</p>
+          <div className="hero-nube">
+            <EstadoGuardado local={guardadoLocal} nube={nube} gh={gh} onGithub={() => setModal({ tipo: 'github' })} onSubir={() => subirNube(true)} />
+            {!nubeActiva && <p className="sub">¿Ya hay una copia en GitHub? Conéctala y la página trae todo lo que se ha trabajado.</p>}
+          </div>
+          <p className="privacy"><Icono.lock />El Excel se lee aquí mismo, en tu navegador, y queda guardado en este equipo para la próxima vez. Si conectas GitHub, se guarda además una copia cifrada con la clave del equipo.</p>
         </main>
+        {modal?.tipo === 'github' && <ModalGithub gh={gh} clave={claveNube} onCancelar={() => setModal(null)} onGuardar={guardarConfigGh} onDesconectar={desconectarGh} onBorrar={borrarEsteEquipo} />}
+        {toast && <div className="toast" role="status">{toast}</div>}
         {ocupado && <Ocupado texto={ocupado} />}
         {devMode && <DevBar valor={fuenteDev} onCambio={setFuenteDev} />}
       </>
@@ -1962,12 +2185,13 @@ function App() {
             ))}
           </nav>
           <div className="side-box">
-            <h3>Revisiones</h3>
-            <p>{totalRevisiones ? plural(totalRevisiones, 'caso revisado', 'casos revisados') : 'Aún no hay casos revisados.'} Las revisiones y el plan de compra se guardan en un archivo que se pasan entre ustedes.</p>
-            {sinGuardar > 0 && <span className="pill pill-warn" style={{ alignSelf: 'flex-start' }}>{plural(sinGuardar, 'cambio sin descargar', 'cambios sin descargar')}</span>}
+            <h3>Guardado</h3>
+            <p>{totalRevisiones ? plural(totalRevisiones, 'caso revisado', 'casos revisados') : 'Aún no hay casos revisados.'} Todo se guarda solo.</p>
+            <EstadoGuardado local={guardadoLocal} nube={nube} gh={gh} onGithub={() => setModal({ tipo: 'github' })} onSubir={() => subirNube(true)} />
+            <p style={{ marginTop: 4 }}>Archivo de respaldo (JSON con clave):</p>
             <div className="row">
               <button className="btn btn-sm" onClick={() => inputJson.current.click()}>Abrir archivo</button>
-              <button className="btn btn-sm btn-primary" onClick={() => setModal({ tipo: 'clave-guardar' })} disabled={!Object.keys(decisiones).length && !compras.fecha}>Descargar</button>
+              <button className="btn btn-sm" onClick={() => setModal({ tipo: 'clave-guardar' })} disabled={!Object.keys(decisiones).length && !compras.fecha}>Descargar</button>
             </div>
             <input ref={inputJson} type="file" accept=".json,application/json" multiple hidden onChange={(e) => { abrirJson([...e.target.files]); e.target.value = ''; }} />
           </div>
@@ -2045,10 +2269,11 @@ function App() {
       </div>
 
       {modal?.tipo === 'decision' && <ModalDecision {...modal} revisor={revisor} onCancelar={() => setModal(null)} onGuardar={guardarDecision} />}
+      {modal?.tipo === 'github' && <ModalGithub gh={gh} clave={claveNube} onCancelar={() => setModal(null)} onGuardar={guardarConfigGh} onDesconectar={desconectarGh} onBorrar={borrarEsteEquipo} />}
       {modal?.tipo === 'clave-guardar' && <ModalClaveGuardar onCancelar={() => setModal(null)} onGuardar={descargarJson} />}
       {modal?.tipo === 'clave-abrir' && <ModalClaveAbrir mala={modal.mala} onCancelar={() => setModal(null)} onAbrir={(c) => abrirJson(modal.files, c)} />}
       {modal?.tipo === 'excel' && (
-        <Modal titulo="Cargar otro Excel" texto="Reemplaza los datos actuales. Las revisiones se conservan." onCerrar={() => setModal(null)}>
+        <Modal titulo="Cargar otro Excel" texto="Reemplaza los datos actuales (también en la copia de GitHub). Las revisiones se conservan." onCerrar={() => setModal(null)}>
           <ZonaArchivo compacta onArchivos={(f) => { setModal(null); cargarExcel(f); }}><b>Arrastra aquí el Excel</b><span>o haz clic para escogerlo</span></ZonaArchivo>
           <div className="modal-actions" style={{ marginTop: 14 }}><button className="btn" onClick={() => setModal(null)}>Cancelar</button></div>
         </Modal>
@@ -2575,6 +2800,81 @@ function ModalClaveAbrir({ mala, onCancelar, onAbrir }) {
     <Modal titulo="Este archivo tiene clave" texto="Escribe la clave que acordaron para las revisiones." onCerrar={onCancelar}>
       <div className="form-row"><label htmlFor="ca">Clave</label><input id="ca" type="password" value={c} onChange={(e) => setC(e.target.value)} autoFocus onKeyDown={(e) => e.key === 'Enter' && c && onAbrir(c)} />{mala && <p className="hint" style={{ color: 'var(--bad)' }}>La clave no es correcta. Intenta de nuevo.</p>}</div>
       <div className="modal-actions"><button className="btn" onClick={onCancelar}>Cancelar</button><button className="btn btn-primary" disabled={!c} onClick={() => onAbrir(c)}>Abrir</button></div>
+    </Modal>
+  );
+}
+function haceCuanto(iso) {
+  if (!iso) return '';
+  const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 10) return 'ahora';
+  if (s < 60) return `hace ${s} s`;
+  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
+  return new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function EstadoGuardado({ local, nube, gh, onGithub, onSubir }) {
+  const [, tic] = useState(0);
+  useEffect(() => { const t = setInterval(() => tic((n) => n + 1), 20000); return () => clearInterval(t); }, []);
+  const n = nube.estado;
+  return (
+    <div className="guardado">
+      <div className="guardado-fila">
+        <span className={`dot-estado ${local === 'error' ? 'mal' : 'bien'}`} />
+        <span>{local === 'error' ? 'No se pudo guardar en este equipo (¿ventana privada?)' : 'Guardado en este equipo'}</span>
+      </div>
+      <div className="guardado-fila">
+        <span className={`dot-estado ${n === 'ok' ? 'bien' : n === 'error' ? 'mal' : n === 'off' ? 'apagado' : 'espera'}`} />
+        <span>
+          {n === 'off' && 'Copia en GitHub: sin conectar'}
+          {n === 'falta-clave' && 'Copia en GitHub: falta la clave'}
+          {n === 'pendiente' && 'Copia en GitHub: hay cambios por subir…'}
+          {n === 'subiendo' && 'Copia en GitHub: sincronizando…'}
+          {n === 'ok' && `Copia en GitHub: al día${nube.fecha ? ' · ' + haceCuanto(nube.fecha) : ''}`}
+          {n === 'error' && <>Copia en GitHub: error<small className="guardado-error">{nube.msg}</small></>}
+        </span>
+      </div>
+      <div className="row">
+        <button className="btn btn-sm" onClick={onGithub}>{gh.token ? (n === 'falta-clave' ? 'Escribir clave' : 'GitHub…') : 'Conectar GitHub'}</button>
+        {(n === 'error' || n === 'pendiente') && <button className="btn btn-sm btn-primary" onClick={onSubir}>Subir ahora</button>}
+      </div>
+    </div>
+  );
+}
+function ModalGithub({ gh, clave, onCancelar, onGuardar, onDesconectar, onBorrar }) {
+  const [cfg, setCfg] = useState({ ...gh });
+  const [c1, setC1] = useState(clave || '');
+  const [probando, setProbando] = useState(false);
+  const [err, setErr] = useState('');
+  const cambiar = (k) => (e) => setCfg((x) => ({ ...x, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+  const puede = cfg.token.trim() && /^[^/\s]+\/[^/\s]+$/.test(cfg.repo.trim()) && cfg.rama.trim() && cfg.ruta.trim() && c1.length >= 10;
+  const probar = async () => {
+    setErr(''); setProbando(true);
+    try {
+      const remota = await ghLeer(cfg);
+      if (remota) await abrirJsonRevisiones(remota.texto, c1); // revisa que la clave sea la misma de la copia
+      onGuardar({ ...cfg, token: cfg.token.trim(), repo: cfg.repo.trim(), rama: cfg.rama.trim(), ruta: cfg.ruta.trim() }, c1);
+    } catch (e) {
+      setErr(e.claveMala ? 'La clave no es la misma con la que se guardó la copia que ya está en GitHub.' : (e.message || String(e)));
+    }
+    setProbando(false);
+  };
+  return (
+    <Modal titulo="Copia en GitHub" texto="La página sube sola una copia cifrada después de cada cambio, y trae lo que suban los demás. Todos deben usar el mismo repositorio, rama, archivo y clave." onCerrar={onCancelar}>
+      <div className="form-row"><label htmlFor="gh-t">Token de GitHub</label><input id="gh-t" type="password" value={cfg.token} onChange={cambiar('token')} autoComplete="off" placeholder="github_pat_…" />
+        <p className="hint">Créalo en GitHub → Settings → Developer settings → Fine-grained tokens. Solo el repositorio {cfg.repo || 'del respaldo'}, permiso <b>Contents: Read and write</b>. Se guarda solo en este equipo.</p></div>
+      <div className="form-row"><label htmlFor="gh-r">Repositorio (dueño/nombre)</label><input id="gh-r" value={cfg.repo} onChange={cambiar('repo')} autoComplete="off" /></div>
+      <div className="form-row"><label htmlFor="gh-b">Rama</label><input id="gh-b" value={cfg.rama} onChange={cambiar('rama')} autoComplete="off" /></div>
+      <div className="form-row"><label htmlFor="gh-p">Archivo</label><input id="gh-p" value={cfg.ruta} onChange={cambiar('ruta')} autoComplete="off" /></div>
+      <div className="form-row"><label htmlFor="gh-c">Clave del equipo (mínimo 10 caracteres)</label><input id="gh-c" type="password" value={c1} onChange={(e) => setC1(e.target.value)} autoComplete="new-password" />
+        <p className="hint">Sin esta clave nadie puede leer la copia. Si se pierde, la copia no se puede abrir: guárdenla en un lugar seguro.</p></div>
+      <label className="check" style={{ padding: '4px 0 12px' }}><input type="checkbox" checked={!!cfg.recordarClave} onChange={cambiar('recordarClave')} /><span>Recordar la clave en este equipo<small>Así no hay que escribirla cada vez. Úsalo solo en tu computador.</small></span></label>
+      {err && <div className="alert alert-bad" role="alert">{err}</div>}
+      <div className="modal-actions" style={{ flexWrap: 'wrap' }}>
+        {gh.token && <button className="btn" onClick={onDesconectar}>Desconectar</button>}
+        <button className="btn" onClick={onBorrar}>Borrar datos de este equipo</button>
+        <span style={{ flex: 1 }} />
+        <button className="btn" onClick={onCancelar}>Cancelar</button>
+        <button className="btn btn-primary" disabled={!puede || probando} onClick={probar}>{probando ? 'Conectando…' : 'Conectar'}</button>
+      </div>
     </Modal>
   );
 }
