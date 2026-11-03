@@ -195,6 +195,10 @@ a{color:var(--tint)}
 .side-box h3{margin:0;font:600 13px/1.3 var(--font-display)}
 .side-box p{margin:0;color:var(--muted);font-size:12px}
 .side-box .row{display:flex;gap:6px;flex-wrap:wrap}
+.bulkbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin:0 0 10px;border-radius:var(--r-md);background:var(--surface-2);font-size:13px;color:var(--muted)}
+.bulkbar.activa{background:var(--tint-soft);color:var(--ink);position:sticky;top:64px;z-index:5;box-shadow:var(--shadow)}
+th.sel,td.sel{width:34px;text-align:center;padding-left:10px;padding-right:4px}
+th.sel input,td.sel input{width:16px;height:16px;accent-color:var(--tint);cursor:pointer}
 .guardado{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ink-2)}
 .guardado-fila{display:flex;gap:8px;align-items:flex-start;line-height:1.35}
 .guardado-fila small{display:block}
@@ -870,7 +874,7 @@ function procesar(datos, decisiones, fechaEntregaIso) {
     grupo.sort((a, b) => (b.enMaestro - a.enMaestro) || (a.primeraVez - b.primeraVez));
     const gana = grupo[0];
     for (const otro of grupo.slice(1)) {
-      otro.rechazo = `Ya lo inscribió ${gana.colaborador} (CC ${gana.ced}, ${gana.sede}). Si son pareja, solo cuenta una vez`;
+      otro.rechazo = `Repetido: ya lo inscribió ${gana.colaborador} (CC ${gana.ced}, ${gana.sede}). Si son pareja, solo cuenta una vez`;
       otro.duplicadoDe = gana.key;
     }
   }
@@ -891,7 +895,10 @@ function procesar(datos, decisiones, fechaEntregaIso) {
       const mismoNombre = restoA === restoB;
       const mismaFecha = a.nacMs != null && a.nacMs === b.nacMs;
       if (mismoNombre || (mismaFecha && similitud(restoA, restoB) >= CONFIG.similitudNombre)) {
-        b.revisar.push(`Parece el mismo niño que "${a.nino}" (doc ${a.doc || 'sin doc'}) con otro documento`);
+        // Repetido: el mismo niño inscrito dos veces con otro documento. Cuenta una sola vez (la primera)
+        // y no pasa por revisión.
+        b.rechazo = `Repetido: ya está inscrito como "${a.nino}" (doc ${a.doc || 'sin doc'}). Solo cuenta una vez`;
+        b.duplicadoDe = a.key;
       }
     }
   }
@@ -902,7 +909,7 @@ function procesar(datos, decisiones, fechaEntregaIso) {
     else if (!k.enMaestro) k.estadoBase = 'retirado';
     else if (k.revisar.length) k.estadoBase = 'revisar';
     else k.estadoBase = 'aprobado';
-    const d = decisiones[k.key];
+    const d = k.duplicadoDe ? null : decisiones[k.key]; // a los repetidos no se les aplica revisión: ya existen
     if (d && d.d) {
       k.decision = d;
       k.estado = d.d === 'OK' ? 'aprobado' : 'rechazado';
@@ -1796,8 +1803,10 @@ function ZonaArchivo({ onArchivos, compacta, children }) {
 }
 
 // Tabla con búsqueda, orden por columna, paginación y botón de descarga
-function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, seleccion }) {
+function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, seleccion, masivo, textoExtra }) {
   const [q, setQ] = useState('');
+  // masivo = { puede(fila), onAccion(filas, 'OK' | 'NO', limpiar) }: casillas para aprobar o no aprobar muchos a la vez
+  const [marcadas, setMarcadas] = useState(() => new Set());
   const [orden, setOrden] = useState({ col: null, dir: 1 });
   const [limite, setLimite] = useState(CONFIG.filasPorPagina);
   const cols = columnas.filter((c) => c.ui !== false);
@@ -1806,7 +1815,7 @@ function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, 
   const filtradas = useMemo(() => {
     let r = filas;
     const nq = normTxt(q);
-    if (nq) r = r.filter((f) => normTxt(columnas.map((c) => c.valor(f)).join(' ')).includes(nq));
+    if (nq) r = r.filter((f) => normTxt(columnas.map((c) => c.valor(f)).join(' ') + ' ' + (textoExtra ? textoExtra(f) : '')).includes(nq));
     if (orden.col) {
       const c = columnas.find((x) => x.id === orden.col);
       const v = c.orden || c.valor;
@@ -1816,6 +1825,15 @@ function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, 
   }, [filas, q, orden, columnas]);
 
   const ordenar = (id) => setOrden((o) => (o.col === id ? { col: id, dir: -o.dir } : { col: id, dir: 1 }));
+  // Selección: solo filas que se pueden revisar; se limpian las que ya no están en la lista
+  const elegibles = masivo ? filtradas.filter(masivo.puede) : [];
+  const clavesFilas = useMemo(() => new Set(filas.map(filaClave)), [filas]);
+  useEffect(() => { setMarcadas((m) => { const n = new Set([...m].filter((k) => clavesFilas.has(k))); return n.size === m.size ? m : n; }); }, [clavesFilas]);
+  const todasMarcadas = elegibles.length > 0 && elegibles.every((f) => marcadas.has(filaClave(f)));
+  const marcarTodas = () => setMarcadas((m) => { const n = new Set(m); elegibles.forEach((f) => (todasMarcadas ? n.delete(filaClave(f)) : n.add(filaClave(f)))); return n; });
+  const marcar = (k) => setMarcadas((m) => { const n = new Set(m); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  const filasMarcadas = masivo ? filas.filter((f) => marcadas.has(filaClave(f))) : [];
+  const limpiar = () => setMarcadas(new Set());
   if (!filas.length) return <div className="table-wrap"><div className="empty"><b>{vacio[0]}</b>{vacio[1]}</div></div>;
   return (
     <div>
@@ -1824,9 +1842,20 @@ function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, 
         <span className="table-meta">{q ? `${fmtNum(filtradas.length)} de ${fmtNum(filas.length)}` : plural(filas.length, 'fila', 'filas')}</span>
         {onDescargar && <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={onDescargar}>Descargar este listado</button>}
       </div>
+      {masivo && elegibles.length > 0 && (
+        <div className={'bulkbar' + (filasMarcadas.length ? ' activa' : '')} role="region" aria-label="Revisar varios a la vez">
+          {filasMarcadas.length ? <>
+            <b>{plural(filasMarcadas.length, 'seleccionado', 'seleccionados')}</b>
+            <button className="btn btn-sm btn-ok" onClick={() => masivo.onAccion(filasMarcadas, 'OK', limpiar)}>Aprobar seleccionados</button>
+            <button className="btn btn-sm btn-bad" onClick={() => masivo.onAccion(filasMarcadas, 'NO', limpiar)}>No aprobar seleccionados</button>
+            <button className="btn-link" onClick={limpiar}>Quitar selección</button>
+          </> : <span>Marca las casillas para aprobar o no aprobar varios a la vez. Tip: busca un motivo (por ejemplo “dígitos”) y marca todos.</span>}
+        </div>
+      )}
       <div className="table-wrap">
         <table>
           <thead><tr>
+            {masivo && <th className="sel"><input type="checkbox" checked={todasMarcadas} disabled={!elegibles.length} onChange={marcarTodas} aria-label={todasMarcadas ? 'Quitar todos' : `Marcar todos (${elegibles.length})`} title={todasMarcadas ? 'Quitar todos' : `Marcar los ${elegibles.length} de la lista`} /></th>}
             {cols.map((c) => (
               <th key={c.id} className={c.num ? 'num' : ''} aria-sort={orden.col === c.id ? (orden.dir > 0 ? 'ascending' : 'descending') : 'none'}>
                 <button onClick={() => ordenar(c.id)}>{c.label}<span className="arrow">{orden.col === c.id ? (orden.dir > 0 ? '▲' : '▼') : ''}</span></button>
@@ -1838,7 +1867,8 @@ function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, 
             {filtradas.slice(0, limite).map((f) => {
               const k = filaClave(f);
               return (
-                <tr key={k} className={(onFila ? 'clickable ' : '') + (seleccion === k ? 'is-selected' : '')} onClick={onFila ? () => onFila(f) : undefined}>
+                <tr key={k} className={(onFila ? 'clickable ' : '') + (seleccion === k || marcadas.has(k) ? 'is-selected' : '')} onClick={onFila ? () => onFila(f) : undefined}>
+                  {masivo && <td className="sel">{masivo.puede(f) && <input type="checkbox" checked={marcadas.has(k)} onChange={() => marcar(k)} onClick={(e) => e.stopPropagation()} aria-label={`Seleccionar ${k}`} />}</td>}
                   {cols.map((c) => (
                     <td key={c.id} className={[c.num && 'num', c.wrap && 'wrap', c.mono && 'mono nowrap'].filter(Boolean).join(' ')}>
                       {c.render ? c.render(f) : c.valor(f)}
@@ -1863,6 +1893,7 @@ function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, 
 
 // Columna "Revisión" con los botones Aprobar / No aprobar
 function CeldaDecision({ k, onDecidir }) {
+  if (k.duplicadoDe) return <span className="pill pill-muted" title="Ya está inscrito: no necesita revisión">Repetido</span>;
   if (k.decision) {
     const ok = k.decision.d === 'OK';
     return (
@@ -2188,6 +2219,20 @@ function App() {
     setModal(null);
     setToast(d === 'OK' ? `${k.nino || 'Niño'} quedó aprobado` : d === 'NO' ? `${k.nino || 'Niño'} quedó como no aprobado` : 'Revisión quitada');
   };
+  const pedirDecisionMasiva = (ks, d, limpiar) => setModal({ tipo: 'decision-masiva', ks, d, limpiar });
+  const guardarDecisionMasiva = (ks, d, motivo, por, limpiar) => {
+    setRevisor(por); guardarLocal('regalos2026.revisor', por);
+    const fecha = new Date().toISOString();
+    setDecisiones((prev) => {
+      const out = { ...prev };
+      for (const k of ks) out[k.key] = { d, motivo: motivo.trim(), por: por.trim(), fecha, nino: k.nino, ced: k.key.split('|')[0], doc: k.doc, asignarA: '' };
+      return out;
+    });
+    setModal(null); limpiar && limpiar();
+    setToast(`${plural(ks.length, 'niño', 'niños')} ${d === 'OK' ? (ks.length === 1 ? 'quedó aprobado' : 'quedaron aprobados') : (ks.length === 1 ? 'quedó como no aprobado' : 'quedaron como no aprobados')}`);
+  };
+  const masivo = { puede: (k) => !k.duplicadoDe, onAccion: pedirDecisionMasiva };
+  const textoMotivos = (k) => [...(k.revisar || []), ...(k.sugerencias || []), k.rechazo || ''].join(' ');
   const totalRevisiones = Object.values(decisiones).filter((d) => d && d.d).length;
 
   const abrirJson = async (files, clave) => {
@@ -2368,7 +2413,7 @@ function App() {
 
           {vista === 'revisar' && (
             <Seccion titulo="Por revisar" texto="Casos raros que necesitan una llamada. Abre el documento, confirma y marca Aprobar o No aprobar. Los ya revisados siguen aquí para poder cambiarlos.">
-              <Tabla filas={L.revisarTodo} columnas={COLS_REVISAR} filaClave={(k) => k.key}
+              <Tabla filas={L.revisarTodo} columnas={COLS_REVISAR} filaClave={(k) => k.key} masivo={masivo} textoExtra={textoMotivos}
                 vacio={['No hay casos por revisar', 'Todo lo inscrito cumple las reglas.']}
                 extra={[
                   { id: 'motivos', label: 'Por qué', render: (k) => <ul className="reasons">{k.revisar.map((r, i) => <li key={i}>{r}</li>)}</ul> },
@@ -2385,7 +2430,7 @@ function App() {
                 <span>¿Entró personal nuevo o corrigieron cédulas? Actualiza el maestro y esta lista se recalcula sola.</span>
                 <button className="btn btn-primary btn-sm" onClick={() => setModal({ tipo: 'maestro' })}>Actualizar maestro</button>
               </div>
-              <Tabla filas={L.retirados} columnas={COLS_RETIRADOS} filaClave={(k) => k.key}
+              <Tabla filas={L.retirados} columnas={COLS_RETIRADOS} filaClave={(k) => k.key} masivo={masivo} textoExtra={textoMotivos}
                 vacio={['Todos están en el maestro', 'Ninguna cédula inscrita falta en el maestro activo.']}
                 extra={[
                   { id: 'sug', label: 'Qué se encontró', render: (k) => (k.sugerencias.length || k.revisar.length)
@@ -2399,8 +2444,8 @@ function App() {
           )}
 
           {vista === 'rechazados' && (
-            <Seccion titulo="Rechazados" texto="No cumplen la edad, ya los inscribió otra persona (pareja) o se marcaron como No aprobado en la revisión.">
-              <Tabla filas={L.rechazados} columnas={COLS_RECHAZADOS} filaClave={(k) => k.key}
+            <Seccion titulo="Rechazados" texto="No cumplen la edad, están repetidos (ya los inscribió otra persona o el mismo colaborador con otro documento) o se marcaron como No aprobado. Los repetidos no se revisan: el niño ya cuenta una vez.">
+              <Tabla filas={L.rechazados} columnas={COLS_RECHAZADOS} filaClave={(k) => k.key} masivo={masivo} textoExtra={textoMotivos}
                 vacio={['No hay rechazados', 'Ningún niño incumple las reglas.']}
                 extra={[
                   { id: 'mot', label: 'Motivo', render: (k) => <span style={{ display: 'block', minWidth: 220, fontSize: 12 }}>{motivoEstado(k)}</span> },
@@ -2427,6 +2472,7 @@ function App() {
         </main>
       </div>
 
+      {modal?.tipo === 'decision-masiva' && <ModalDecisionMasiva {...modal} revisor={revisor} onCancelar={() => setModal(null)} onGuardar={guardarDecisionMasiva} />}
       {modal?.tipo === 'decision' && <ModalDecision {...modal} revisor={revisor} onCancelar={() => setModal(null)} onGuardar={guardarDecision} />}
       {modal?.tipo === 'github' && <ModalGithub gh={gh} clave={claveNube} onCancelar={() => setModal(null)} onGuardar={guardarConfigGh} onDesconectar={desconectarGh} onBorrar={borrarEsteEquipo} />}
       {modal?.tipo === 'clave-guardar' && <ModalClaveGuardar onCancelar={() => setModal(null)} onGuardar={descargarJson} />}
@@ -2897,6 +2943,38 @@ function Modal({ titulo, texto, onCerrar, children }) {
         <h2>{titulo}</h2>{texto && <p>{texto}</p>}{children}
       </div>
     </div>
+  );
+}
+function ModalDecisionMasiva({ ks, d, limpiar, revisor, onCancelar, onGuardar }) {
+  const [dec, setDec] = useState(d || 'OK');
+  const [motivo, setMotivo] = useState('');
+  const [por, setPor] = useState(revisor || '');
+  const puede = por.trim() && (dec === 'OK' || motivo.trim());
+  const yaRevisados = ks.filter((k) => k.decision).length;
+  const muestra = ks.slice(0, 6).map((k) => k.nino || 'Sin nombre').join(', ') + (ks.length > 6 ? ` y ${fmtNum(ks.length - 6)} más` : '');
+  return (
+    <Modal titulo={`Revisar ${plural(ks.length, 'niño', 'niños')} a la vez`} texto={muestra} onCerrar={onCancelar}>
+      <div className="form-row">
+        <span className="lbl">Decisión para todos</span>
+        <div className="segmented" role="group">
+          <button aria-pressed={dec === 'OK'} onClick={() => setDec('OK')}>Aprobar</button>
+          <button aria-pressed={dec === 'NO'} onClick={() => setDec('NO')}>No aprobar</button>
+        </div>
+      </div>
+      {yaRevisados > 0 && <div className="alert alert-warn">{plural(yaRevisados, 'ya tenía revisión', 'ya tenían revisión')}: se reemplaza por esta.</div>}
+      <div className="form-row">
+        <label htmlFor="motivo-m">Motivo{dec === 'NO' ? '' : ' (opcional)'}</label>
+        <input id="motivo-m" type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} placeholder={dec === 'OK' ? 'Ej: documentos verificados con talento humano' : 'Ej: no cumplen los requisitos'} autoFocus />
+      </div>
+      <div className="form-row">
+        <label htmlFor="por-m">Tu nombre</label>
+        <input id="por-m" type="text" value={por} onChange={(e) => setPor(e.target.value)} maxLength={60} placeholder="Quién revisa" />
+      </div>
+      <div className="modal-actions">
+        <button className="btn" onClick={onCancelar}>Cancelar</button>
+        <button className="btn btn-primary" disabled={!puede} onClick={() => onGuardar(ks, dec, motivo, por, limpiar)}>{dec === 'OK' ? `Aprobar ${fmtNum(ks.length)}` : `No aprobar ${fmtNum(ks.length)}`}</button>
+      </div>
+    </Modal>
   );
 }
 function ModalDecision({ k, d, revisor, onCancelar, onGuardar }) {
