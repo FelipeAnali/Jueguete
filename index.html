@@ -1,0 +1,2594 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- La página no tiene datos adentro, pero igual se le pide a los buscadores que no la indexen -->
+<meta name="robots" content="noindex,nofollow">
+<title>Regalos de Navidad 2026</title>
+<!--
+  =====================================================================
+  REGALOS DE NAVIDAD 2026 · HIJOS DE COLABORADORES
+  Supertiendas Cañaveral S.A.S. · Gestión Humana
+  ---------------------------------------------------------------------
+  Qué hace esta página:
+    1. Lee uno o varios Excel que el usuario arrastra (respuestas crudas
+       del Microsoft Forms + hoja del maestro de personal activo).
+       TODO se procesa en el navegador: el archivo NO se sube a ningún
+       servidor y la página no guarda datos personales.
+    2. Aplica las reglas del registro (edad, repetidos, reenvíos, pareja,
+       personas que no están en el maestro, casos raros para revisar).
+    3. Muestra conteos (total, por edad, por rango, por género, por sede).
+    4. Permite revisar casos especiales (Aprobar / No aprobar con motivo).
+       Esas decisiones se guardan en un archivo JSON (opcionalmente
+       cifrado con clave) que el equipo se pasa entre sí.
+    5. Descarga listados en Excel y planillas de firma en PDF
+       (para imprimir o con campos de firma digital).
+
+  Librerías (CDN, versiones fijas):
+    React 18.3.1 + Babel standalone 7.24.7 (JSX en el navegador)
+    SheetJS (xlsx) 0.18.5 ...... leer y escribir Excel
+    jsPDF 2.5.1 + AutoTable 3.8.2 ... armar el PDF de firmas
+    pdf-lib 1.17.1 ............. agregar campos de firma digital al PDF
+
+  Modo de pruebas: agregar ?dev a la URL muestra abajo un selector con
+  datos inventados (Demo / Peor caso / Uno / Vacío) para probar la
+  interfaz sin datos reales. No afecta el uso normal.
+  =====================================================================
+-->
+<style>
+/* =====================================================================
+   1. TOKENS DE DISEÑO
+   Colores de marca Cañaveral (tinta #05200b, bosque #1C5A2A, lima #7dd105)
+   sobre una base estilo Apple (gris #f5f5f7, superficies blancas, fuente
+   del sistema). Femenino y Masculino usan dos colores bien distintos.
+   ===================================================================== */
+:root{
+  --bg:#f5f5f7;
+  --surface:#ffffff;
+  --surface-2:#f2f3f1;
+  --ink:#05200b;
+  --ink-2:#2f3b32;
+  --muted:#5f6a62;
+  --line:rgba(5,32,11,.11);
+  --line-strong:rgba(5,32,11,.2);
+  --tint:#1C5A2A;
+  --tint-press:#154520;
+  --tint-soft:rgba(28,90,42,.09);
+  --on-tint:#ffffff;
+  --lime:#7dd105;
+  --fem:#c47a1f;
+  --mas:#1C5A2A;
+  --otro:#9aa39c;
+  --warn:#8a5300;
+  --warn-soft:#fff3dc;
+  --bad:#b42318;
+  --bad-soft:#fdeceb;
+  --ok:#1C5A2A;
+  --ok-soft:#e6f1e2;
+  --glass:rgba(245,245,247,.78);
+  --shadow:0 1px 2px rgba(5,32,11,.05), 0 6px 20px rgba(5,32,11,.05);
+  --shadow-pop:0 12px 40px rgba(5,32,11,.18);
+  --r-lg:18px;
+  --r-md:12px;
+  --r-sm:8px;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+/* Modo oscuro: sigue la configuración del sistema */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e;
+    --ink:#f5f5f7; --ink-2:#d7dad8; --muted:#a1a8a3;
+    --line:rgba(255,255,255,.12); --line-strong:rgba(255,255,255,.22);
+    --tint:#7dd105; --tint-press:#6bb604; --tint-soft:rgba(125,209,5,.14); --on-tint:#05200b;
+    --fem:#e3a25a; --mas:#6fbf4a; --otro:#8d948f;
+    --warn:#f2b34c; --warn-soft:rgba(242,179,76,.14);
+    --bad:#ff7b6e; --bad-soft:rgba(255,123,110,.14);
+    --ok:#7dd105; --ok-soft:rgba(125,209,5,.14);
+    --glass:rgba(0,0,0,.72);
+    --shadow:none; --shadow-pop:0 12px 40px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e;
+  --ink:#f5f5f7; --ink-2:#d7dad8; --muted:#a1a8a3;
+  --line:rgba(255,255,255,.12); --line-strong:rgba(255,255,255,.22);
+  --tint:#7dd105; --tint-press:#6bb604; --tint-soft:rgba(125,209,5,.14); --on-tint:#05200b;
+  --fem:#e3a25a; --mas:#6fbf4a; --otro:#8d948f;
+  --warn:#f2b34c; --warn-soft:rgba(242,179,76,.14);
+  --bad:#ff7b6e; --bad-soft:rgba(255,123,110,.14);
+  --ok:#7dd105; --ok-soft:rgba(125,209,5,.14);
+  --glass:rgba(0,0,0,.72);
+  --shadow:none; --shadow-pop:0 12px 40px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+
+/* =====================================================================
+   2. BASE
+   ===================================================================== */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.45 var(--font);
+  -webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums; /* los números no "bailan" al cambiar */
+}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--tint)}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--tint) 55%,transparent);outline-offset:2px;border-radius:6px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* =====================================================================
+   3. BARRA SUPERIOR (vidrio translúcido, como macOS)
+   ===================================================================== */
+.topbar{
+  position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;gap:16px;
+  padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));
+  background:var(--glass);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand img{height:30px;width:auto;flex-shrink:0}
+.brand-text{min-width:0}
+.brand-text b{display:block;font:600 15px/1.2 var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-text span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-tools{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.field-inline{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.field-inline input,.field-inline select{
+  height:32px;border:1px solid var(--line-strong);border-radius:var(--r-sm);
+  background:var(--surface);padding:0 10px;font-size:13px;color:var(--ink);min-width:0;
+}
+.field-inline select{max-width:240px}
+
+/* =====================================================================
+   4. BOTONES
+   Todo lo que se presiona se encoge un poquito (scale .97) para que se
+   sienta que respondió.
+   ===================================================================== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:34px;padding:0 14px;border-radius:999px;border:1px solid transparent;
+  background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:600;
+  cursor:pointer;white-space:nowrap;
+  transition:transform 140ms var(--ease-out),background-color 160ms ease;
+}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-primary{background:var(--tint);color:var(--on-tint)}
+.btn-primary:hover{background:var(--tint-press)}
+.btn-ghost{background:transparent;border-color:var(--line-strong)}
+.btn-sm{height:28px;padding:0 10px;font-size:12px}
+.btn-ok{background:var(--ok-soft);color:var(--ok)}
+.btn-bad{background:var(--bad-soft);color:var(--bad)}
+.btn-link{background:none;border:0;padding:0;height:auto;color:var(--tint);font-weight:600;cursor:pointer;font-size:12px}
+@media (hover:hover) and (pointer:fine){
+  .btn:not(.btn-primary):hover{background:color-mix(in srgb,var(--surface-2) 80%,var(--ink) 6%)}
+}
+
+/* =====================================================================
+   5. ESTRUCTURA: menú lateral + contenido
+   ===================================================================== */
+.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:calc(100vh - 53px)}
+.sidebar{
+  position:sticky;top:53px;align-self:start;height:calc(100vh - 53px);overflow:auto;
+  padding:20px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:20px;
+}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:8px 10px;border:0;border-radius:var(--r-sm);background:none;cursor:pointer;font-size:14px;
+}
+.nav button[aria-current="page"]{background:var(--tint);color:var(--on-tint)}
+.nav button[aria-current="page"] .count{color:inherit;opacity:.85}
+@media (hover:hover) and (pointer:fine){ .nav button:not([aria-current="page"]):hover{background:var(--tint-soft)} }
+.nav .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--line-strong)}
+.nav .label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav .count{font-size:12px;color:var(--muted);flex-shrink:0}
+.side-box{border-top:1px solid var(--line);padding:16px 10px 0;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.side-box h3{margin:0;font:600 13px/1.3 var(--font-display)}
+.side-box p{margin:0;color:var(--muted);font-size:12px}
+.side-box .row{display:flex;gap:6px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:2px 8px}
+.pill-warn{background:var(--warn-soft);color:var(--warn)}
+.pill-ok{background:var(--ok-soft);color:var(--ok)}
+.pill-bad{background:var(--bad-soft);color:var(--bad)}
+.pill-muted{background:var(--surface-2);color:var(--muted)}
+
+.main{padding:28px clamp(16px,3vw,40px) 80px;min-width:0}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.page-head h1{margin:0;font:700 30px/1.15 var(--font-display);letter-spacing:-.02em}
+.page-head p{margin:6px 0 0;color:var(--muted);max-width:68ch}
+
+/* En celular el menú lateral pasa a ser una fila deslizable arriba */
+@media (max-width:860px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .sidebar{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:10px 16px;gap:12px}
+  .nav{flex-direction:row;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+  .nav::-webkit-scrollbar{display:none}
+  .nav button{width:auto;flex-shrink:0;padding:7px 12px;border-radius:999px;background:var(--surface)}
+  .nav .label{overflow:visible}
+  .side-box{padding:10px 0 0}
+  .topbar{flex-wrap:wrap}
+  .topbar-tools{margin-left:0;width:100%;justify-content:flex-start}
+  .page-head h1{font-size:26px}
+}
+
+/* =====================================================================
+   6. PANTALLA INICIAL: zona para arrastrar el Excel
+   ===================================================================== */
+.hero{max-width:760px;margin:6vh auto 0;padding:0 16px}
+.hero h1{font:700 clamp(34px,6vw,56px)/1.04 var(--font-display);letter-spacing:-.03em;margin:0 0 14px}
+.hero > p{font-size:18px;color:var(--ink-2);margin:0 0 28px;max-width:56ch}
+.drop{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  min-height:240px;padding:32px 20px;text-align:center;border-radius:24px;
+  background:var(--surface);border:2px dashed var(--line-strong);cursor:pointer;
+  transition:border-color 160ms ease,background-color 160ms ease,transform 200ms var(--ease-out);
+}
+.drop.over{border-color:var(--tint);background:var(--tint-soft);transform:scale(1.01)}
+.drop b{font:600 20px/1.2 var(--font-display)}
+.drop span{color:var(--muted);font-size:14px}
+.drop-icon{width:56px;height:56px;color:var(--tint)}
+.req{margin:22px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+.req li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink-2)}
+.req li svg{flex-shrink:0;margin-top:2px;color:var(--tint)}
+.privacy{margin-top:22px;font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:flex-start}
+.privacy svg{flex-shrink:0;margin-top:1px}
+.alert{border-radius:var(--r-md);padding:12px 14px;font-size:14px;margin:16px 0}
+.alert-bad{background:var(--bad-soft);color:var(--bad)}
+.alert-warn{background:var(--warn-soft);color:var(--warn)}
+
+/* =====================================================================
+   7. RESUMEN
+   ===================================================================== */
+.lead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:4px 0 6px}
+.lead .big{font:700 clamp(56px,9vw,96px)/.95 var(--font-display);letter-spacing:-.045em;color:var(--tint)}
+.lead .big-label{font:600 clamp(20px,2.4vw,26px)/1.2 var(--font-display);letter-spacing:-.01em;max-width:22ch}
+.facts{display:flex;flex-wrap:wrap;gap:0;margin:18px 0 28px;border-top:1px solid var(--line)}
+.fact{padding:14px 28px 4px 0;flex:0 1 auto;min-width:140px}
+@media (max-width:560px){ .fact{flex:1 1 40%;padding-right:12px} }
+.fact b{display:block;font:600 22px/1.2 var(--font-display)}
+.fact span{font-size:13px;color:var(--muted)}
+.fact button{all:unset;cursor:pointer;display:block}
+.fact button:focus-visible{outline:3px solid color-mix(in srgb,var(--tint) 55%,transparent);border-radius:6px}
+
+.section{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:22px clamp(16px,2.4vw,28px);margin-bottom:22px}
+.section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.section h2{margin:0;font:600 19px/1.25 var(--font-display);letter-spacing:-.01em}
+.section-head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* Escalera de edades: 11 columnas (0 a 10 años) apiladas por género,
+   con los rangos de compra agrupados debajo de sus columnas */
+.ladder{margin:0}
+.ladder-cols,.ladder-bands{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:8px}
+.ladder-cols{height:220px;align-items:end}
+.ladder-col{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.ladder-total{font-size:13px;font-weight:600;margin-bottom:6px}
+.ladder-bar{width:100%;max-width:56px;display:flex;flex-direction:column-reverse;border-radius:8px 8px 3px 3px;overflow:hidden;min-height:0;transition:height 300ms var(--ease-out)}
+.ladder-bar i{display:block;flex-basis:0;min-height:0}
+.ladder-bar .seg-f{background:var(--fem)}
+.ladder-bar .seg-m{background:var(--mas)}
+.ladder-bar .seg-o{background:var(--otro)}
+.ladder-age{margin-top:8px;font-size:13px;color:var(--muted)}
+.ladder-axis{border-top:1px solid var(--line-strong);margin-top:0}
+.ladder-bands{margin-top:12px}
+.band{border-top:3px solid var(--tint);padding-top:8px;min-width:0}
+.band b{display:block;font:600 20px/1.1 var(--font-display)}
+.band span{display:block;font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band small{display:block;font-size:12px;color:var(--muted)}
+.ladder figcaption{margin-top:14px;font-size:12px;color:var(--muted)}
+@media (max-width:560px){
+  .ladder-cols,.ladder-bands{gap:4px}
+  .ladder-total{font-size:11px}
+  .band b{font-size:16px}
+}
+
+/* =====================================================================
+   8. TABLAS
+   ===================================================================== */
+.table-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.search{
+  flex:1;min-width:200px;max-width:420px;height:36px;border-radius:10px;border:1px solid transparent;
+  background:var(--surface-2);padding:0 12px 0 34px;font-size:14px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23868e88' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:11px center;
+}
+.search:focus{border-color:var(--tint);outline:none;background-color:var(--surface)}
+.table-meta{font-size:13px;color:var(--muted)}
+.table-wrap{overflow-x:auto;border-radius:var(--r-md);border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+tbody tr:last-child td{border-bottom:0}
+th{position:sticky;top:0;background:var(--surface-2);font-weight:600;font-size:12px;color:var(--ink-2);white-space:nowrap;z-index:1}
+th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+th button:focus-visible{outline:2px solid var(--tint);border-radius:4px}
+th .arrow{font-size:10px;color:var(--muted)}
+td.num,th.num{text-align:right}
+td .sub{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+td.wrap{min-width:180px;max-width:320px;overflow-wrap:anywhere}
+td.nowrap{white-space:nowrap}
+.mono{font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.reasons{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;min-width:200px}
+.reasons li{font-size:12px;line-height:1.35}
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font:600 16px/1.3 var(--font-display);margin-bottom:4px}
+.more{display:flex;justify-content:center;padding:14px}
+.decision{display:flex;flex-direction:column;gap:6px;min-width:150px}
+.decision .row{display:flex;gap:6px;flex-wrap:wrap}
+.decision small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+tr.clickable{cursor:pointer}
+@media (hover:hover) and (pointer:fine){ tr.clickable:hover td{background:var(--tint-soft)} }
+tr.is-selected td{background:var(--tint-soft)}
+tfoot td{font-weight:700;background:var(--surface-2);border-top:1px solid var(--line-strong)}
+
+/* =====================================================================
+   9. DESCARGAS
+   ===================================================================== */
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px}
+.checks{display:grid;gap:2px;margin:0 0 16px}
+.check{display:flex;gap:10px;align-items:flex-start;padding:9px 6px;border-radius:var(--r-sm);cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--tint);width:16px;height:16px;flex-shrink:0}
+.check span{flex:1;min-width:0}
+.check small{display:block;color:var(--muted);font-size:12px}
+.check em{font-style:normal;color:var(--muted);font-size:12px;flex-shrink:0}
+@media (hover:hover) and (pointer:fine){ .check:hover{background:var(--surface-2)} }
+.segmented{display:inline-flex;background:var(--surface-2);border-radius:10px;padding:2px;gap:2px;flex-wrap:wrap}
+.segmented button{border:0;background:none;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer}
+.segmented button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600}
+.form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.form-row label,.form-row .lbl{font-size:13px;font-weight:600}
+.form-row select,.form-row input[type=text],.form-row input[type=password]{
+  height:38px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);padding:0 12px;font-size:14px;width:100%;
+}
+.hint{font-size:12px;color:var(--muted);margin:0}
+
+/* =====================================================================
+   9B. PRESUPUESTO Y COMPRA
+   ===================================================================== */
+.budget-controls{display:grid;grid-template-columns:minmax(180px,240px) minmax(220px,1fr) minmax(220px,1fr);gap:20px;align-items:start}
+.money-input{font:600 20px/1 var(--font-display)!important;height:44px!important}
+input[type=range]{width:100%;accent-color:var(--tint)}
+.budget-meter{border-top:1px solid var(--line);margin-top:6px;padding-top:18px}
+.budget-figures{display:flex;flex-wrap:wrap;gap:8px 32px;margin-bottom:14px}
+.budget-figures b{display:block;font:600 22px/1.2 var(--font-display)}
+.budget-figures span{font-size:13px;color:var(--muted)}
+.gasto-frase{font:500 18px/1.4 var(--font-display);margin:0 0 12px;max-width:70ch}
+.tint{color:var(--tint)}
+.stack{display:flex;height:14px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-bottom:14px}
+.stack i{display:block;height:100%;transition:width 300ms var(--ease-out)}
+.s-gasto{background:var(--tint)}
+.s-gasto.over{background:var(--bad)}
+.s-disp{background:color-mix(in srgb,var(--lime) 45%,var(--surface-2))}
+.s-res{background:repeating-linear-gradient(45deg,var(--line-strong) 0 4px,transparent 4px 8px)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:2px}
+.bar{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-bottom:8px}
+.bar i{display:block;height:100%;background:var(--tint);border-radius:99px;transition:width 300ms var(--ease-out)}
+.bar i.over{background:var(--bad)}
+.neg{color:var(--bad)}
+.muted{color:var(--muted)}
+.guide{margin:0 0 22px;padding:0;list-style:none;counter-reset:paso;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px}
+.guide li{counter-increment:paso;position:relative;padding:12px 14px 12px 46px;border-radius:var(--r-md);background:var(--surface);box-shadow:var(--shadow);font-size:13px;color:var(--ink-2)}
+.guide li::before{content:counter(paso);position:absolute;left:14px;top:12px;width:22px;height:22px;border-radius:50%;background:var(--tint);color:var(--on-tint);font-weight:700;font-size:12px;display:grid;place-items:center}
+.guide b{color:var(--ink)}
+.plan-empty{display:flex;flex-direction:column;gap:8px;padding:4px 0}
+/* Grupo de edad dentro de un rango */
+.plan-group{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:10px;background:var(--surface-2)}
+.plan-group-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.plan-group-head b{font:600 14px/1.3 var(--font-display)}
+.plan-group-head span{font-size:12px;color:var(--muted)}
+.plan-group-head .plan-group-money{margin-left:auto;font-weight:600;color:var(--ink-2)}
+.plan-group .plan-foot{border-top:0;padding-top:0;align-items:center}
+.plan-group .plan-row select,.plan-group .plan-row input{background:var(--surface)}
+.plan-row select.mal{border-color:var(--warn);color:var(--warn)}
+.plan-foot-total{font-size:14px}
+.warn{color:var(--warn)}
+.pos{color:var(--ok)}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:16px}
+.plan-range{border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.plan-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.plan-head b{display:block;font:600 17px/1.25 var(--font-display)}
+.plan-head span{font-size:12px;color:var(--muted)}
+.plan-money{text-align:right;flex-shrink:0}
+.plan-money b{font-size:15px}
+.plan-row{display:grid;grid-template-columns:minmax(0,1fr) 72px 104px 28px;gap:8px;align-items:center}
+.plan-row select,.plan-row input{height:34px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);padding:0 8px;font-size:13px;min-width:0;width:100%}
+.plan-row input{text-align:right}
+.plan-sub{text-align:right;font-size:13px;font-weight:600;white-space:nowrap}
+.plan-sub small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
+.btn-x{border:0;background:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;border-radius:6px;height:28px}
+@media (hover:hover) and (pointer:fine){ .btn-x:hover{background:var(--bad-soft);color:var(--bad)} }
+.plan-range .btn-link{align-self:flex-start}
+.plan-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px;font-size:13px;font-weight:600}
+.plan-foot small{font-weight:400}
+.price-input{width:100px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);text-align:right;padding:0 8px;font-size:13px}
+@media (max-width:860px){ .budget-controls{grid-template-columns:1fr} }
+@media (max-width:440px){
+  .plan-range{padding:12px}
+  /* En celular: el juguete ocupa toda la línea; abajo cantidad, subtotal y quitar */
+  .plan-row{grid-template-columns:72px minmax(0,1fr) 24px;gap:6px}
+  .plan-row select{grid-column:1 / -1}
+}
+
+/* =====================================================================
+   10. VENTANA MODAL Y AVISO FLOTANTE (toast)
+   ===================================================================== */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.32);display:grid;place-items:center;z-index:50;padding:16px;
+  animation:fadeIn 180ms ease-out}
+.modal{width:min(460px,100%);background:var(--surface);border-radius:20px;box-shadow:var(--shadow-pop);padding:22px;
+  animation:popIn 220ms var(--ease-out)}
+.modal h2{margin:0 0 4px;font:600 19px/1.25 var(--font-display);overflow-wrap:anywhere}
+.modal > p{margin:0 0 16px;color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;flex-wrap:wrap}
+.modal-actions .spacer{flex:1}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes popIn{from{opacity:0;transform:scale(.96)}}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:var(--shadow-pop);max-width:calc(100vw - 32px);
+  animation:toastIn 220ms var(--ease-out)}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,8px)}}
+.busy{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 70%,transparent);display:grid;place-items:center;z-index:70;font-weight:600}
+.spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--line-strong);border-top-color:var(--tint);animation:spin 700ms linear infinite;margin:0 auto 10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){
+  .modal,.toast,.drop,.ladder-bar{animation:fadeIn 150ms ease-out;transition:none}
+}
+
+/* Selector de datos de prueba (solo con ?dev en la URL) */
+.devbar{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:80;display:flex;gap:2px;padding:3px;
+  background:#e5e5e5;border-radius:10px;font:12px system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.devbar button{border:0;background:none;padding:6px 10px;border-radius:8px;cursor:pointer;color:#222}
+.devbar button[aria-pressed="true"]{background:#fff;font-weight:600}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<noscript>Esta herramienta necesita JavaScript activado.</noscript>
+
+<!-- Librerías desde CDN, versiones fijas -->
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useEffect, useRef, useCallback } = React;
+
+/* =====================================================================
+   1. CONFIGURACIÓN
+   Si cambia una regla del registro, se cambia aquí.
+   ===================================================================== */
+const CONFIG = {
+  anio: 2026,
+  nacidosDesde: '2016-01-01',          // regla de admisión: nacidos desde esta fecha
+  fechaEntregaPorDefecto: '2026-12-15', // la edad se calcula a esta fecha (se puede cambiar en pantalla)
+  rangos: [                             // rangos para la compra de regalos
+    // Mismos rangos del catálogo de juguetes (definidos por Gestión Humana, nov. 2026)
+    { id: '0',   label: '0 años',     min: 0,  max: 0 },
+    { id: '1-3', label: '1 a 3 años', min: 1,  max: 3 },
+    { id: '4-6', label: '4 a 6 años', min: 4,  max: 6 },
+    { id: '7-9', label: '7 a 9 años', min: 7,  max: 9 },
+    { id: '10',  label: '10 años',    min: 10, max: 10 },
+  ],
+  edadMax: 10,
+  digitosDocMin: 10,                    // documentos de niño con menos dígitos van a revisar
+  digitosDocMax: 11,                    // ... o con más dígitos
+  similitudNombre: 0.85,                // 0 a 1: qué tan parecidos deben ser dos nombres para alertar
+  logoUrl: 'https://felipeanali.github.io/logo-canaveral.png/logo-canaveral.png',
+  iteracionesClave: 310000,             // PBKDF2: hace lento adivinar la clave del JSON
+  filasPorPagina: 100,
+  empresa: 'Supertiendas Cañaveral S.A.S.',
+};
+
+/* =====================================================================
+   2. UTILIDADES DE TEXTO, NÚMEROS Y FECHAS
+   Las fechas se manejan como milisegundos "UTC de pared" (sin zona
+   horaria) para que una fecha del Excel nunca se corra un día.
+   ===================================================================== */
+const DIA_MS = 86400000;
+
+// Quita tildes, espacios raros (el   que trae Forms) y pasa a minúsculas
+const quitarTildes = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+const normTxt = (v) => quitarTildes(String(v ?? '')).replace(/ /g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+
+// Deja solo los dígitos (cédulas y documentos). Si Excel lo guardó como número, se respeta.
+const soloDigitos = (v) => {
+  if (v == null) return '';
+  if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v)) : '';
+  return String(v).replace(/\D/g, '');
+};
+
+const texto = (v) => (v == null ? '' : String(v).replace(/ /g, ' ').replace(/\s+/g, ' ').trim());
+
+// "MARIA DE LOS ANGELES" -> "Maria de los Angeles"
+const MINUSCULAS = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'e', 'da', 'van', 'von']);
+const nombrePropio = (s) => texto(s).toLocaleLowerCase('es').split(' ').map((p, i) =>
+  (i > 0 && MINUSCULAS.has(p)) ? p : p.replace(/(^|[-'])(\p{L})/gu, (m, a, b) => a + b.toLocaleUpperCase('es'))
+).join(' ');
+
+const fmtNum = (n) => new Intl.NumberFormat('es-CO').format(n || 0);
+const fmtPct = (n) => new Intl.NumberFormat('es-CO', { style: 'percent', maximumFractionDigits: 0 }).format(n || 0);
+const plural = (n, uno, varios) => `${fmtNum(n)} ${n === 1 ? uno : varios}`;
+
+// Número de serie de Excel (días desde 1900) -> milisegundos
+const serialAMs = (n) => Math.round((n - 25569) * DIA_MS);
+
+// Convierte lo que venga del Excel (número, fecha o texto) a milisegundos, o null
+function aMs(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? serialAMs(v) : null;
+  if (v instanceof Date) return isNaN(v) ? null : Date.UTC(v.getFullYear(), v.getMonth(), v.getDate(), v.getHours(), v.getMinutes(), v.getSeconds());
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) return armarFecha(+m[1], +m[2], +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+  // dd/mm/aaaa (formato colombiano), con hora opcional y a. m./p. m.
+  m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap])?\.?\s?m?\.?)?/i);
+  if (m) {
+    let h = +(m[4] || 0);
+    if (m[7]) { const pm = m[7].toLowerCase() === 'p'; if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0; }
+    return armarFecha(+m[3], +m[2], +m[1], h, +(m[5] || 0), +(m[6] || 0));
+  }
+  return null;
+}
+function armarFecha(a, mes, d, h = 0, mi = 0, s = 0) {
+  if (mes < 1 || mes > 12 || d < 1 || d > 31 || a < 1900 || a > 2100) return null;
+  const ms = Date.UTC(a, mes - 1, d, h, mi, s);
+  return new Date(ms).getUTCDate() === d ? ms : null; // descarta 31/02 y similares
+}
+const soloDia = (ms) => (ms == null ? null : Math.floor(ms / DIA_MS) * DIA_MS);
+const fmtFecha = (ms) => {
+  if (ms == null) return '';
+  const d = new Date(ms);
+  return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+};
+const fmtFechaLarga = (ms) => ms == null ? '' :
+  new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(ms));
+const fmtFechaHora = (ms) => ms == null ? '' :
+  new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(ms));
+
+// Edad cumplida a la fecha de corte
+function edadEn(nacMs, corteMs) {
+  const n = new Date(nacMs), c = new Date(corteMs);
+  let e = c.getUTCFullYear() - n.getUTCFullYear();
+  if (c.getUTCMonth() < n.getUTCMonth() || (c.getUTCMonth() === n.getUTCMonth() && c.getUTCDate() < n.getUTCDate())) e--;
+  return e;
+}
+const rangoDe = (edad) => (edad == null ? null : (CONFIG.rangos.find((r) => edad >= r.min && edad <= r.max) || null));
+
+// Género a una letra: F, M u O (otro / vacío)
+const generoCorto = (g) => { const n = normTxt(g); return n.startsWith('fem') ? 'F' : n.startsWith('mas') ? 'M' : 'O'; };
+
+// Distancia de edición: cuántas letras hay que cambiar para pasar de a a b
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+const similitud = (a, b) => { const x = normTxt(a), y = normTxt(b); const m = Math.max(x.length, y.length); return m ? 1 - levenshtein(x, y) / m : 1; };
+const tokensNombre = (s) => normTxt(s).split(' ').filter((t) => t.length >= 3 && !MINUSCULAS.has(t));
+const slug = (s) => quitarTildes(String(s || 'todas')).replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '').slice(0, 40) || 'todas';
+const hoyIso = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`; };
+
+/* =====================================================================
+   3. LECTURA DEL EXCEL
+   Busca en todas las hojas de todos los archivos:
+     - La hoja de RESPUESTAS del Forms: la que tiene "Numero de Documento"
+       y columnas "(Hijo 1)", "(Hijo 2)"...
+     - La hoja del MAESTRO: la que tiene "Empleado" y "Nombre del empleado".
+   No importa el nombre de la hoja ni el orden de las columnas.
+   ===================================================================== */
+async function leerArchivos(files) {
+  const respuestas = new Map(); // Id de respuesta -> respuesta (si se carga dos veces, no se duplica)
+  const maestro = new Map();    // cédula -> persona
+  let hayForms = false, hayMaestro = false;
+  const nombres = [];
+  for (const file of files) {
+    nombres.push(file.name);
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+    for (const nombreHoja of wb.SheetNames) {
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], { header: 1, raw: true, defval: null, blankrows: false });
+      // Busca la fila de encabezados entre las primeras 10
+      for (let f = 0; f < Math.min(10, filas.length); f++) {
+        const enc = (filas[f] || []).map(normTxt);
+        if (enc.includes('numero de documento') && enc.some((h) => /\(hijo 1\)$/.test(h))) {
+          hayForms = true;
+          leerRespuestas(enc, filas.slice(f + 1)).forEach((r) => respuestas.set(r.id + '|' + r.ced, r));
+          break;
+        }
+        if (enc.includes('empleado') && enc.includes('nombre del empleado')) {
+          hayMaestro = true;
+          leerMaestro(enc, filas.slice(f + 1)).forEach((m) => maestro.set(m.ced, m));
+          break;
+        }
+      }
+    }
+  }
+  return {
+    respuestas: hayForms ? [...respuestas.values()] : null,
+    maestro: hayMaestro ? [...maestro.values()] : null,
+    archivos: nombres,
+  };
+}
+
+// Convierte las filas del Forms (formato ancho: 6 bloques de hijo por fila) en objetos
+function leerRespuestas(enc, filas) {
+  const col = (pred) => enc.findIndex(pred);
+  const c = {
+    id: col((h) => h === 'id'),
+    fin: col((h) => h.startsWith('hora de finalizacion')),
+    nombre: col((h) => h === 'nombres y apellidos'),
+    ced: col((h) => h === 'numero de documento'),
+    correo: enc.lastIndexOf('correo electronico'), // el último es el que escribió la persona
+    sede: col((h) => h.startsWith('descripcion c.o')),
+    tiene: col((h) => h.startsWith('¿tienes')),
+  };
+  // Columnas de cada hijo: "Nombre ... (Hijo 3)" -> hijos[3].nombre
+  const hijosCols = {};
+  enc.forEach((h, i) => {
+    const m = h.match(/\(hijo (\d+)\)$/);
+    if (!m) return;
+    const n = +m[1];
+    const base = h.replace(/\s*\(hijo \d+\)$/, '');
+    const slot = (hijosCols[n] = hijosCols[n] || {});
+    if (base.startsWith('nombres y apellidos')) slot.nombre = i;
+    else if (base.startsWith('genero')) slot.genero = i;
+    else if (base.startsWith('tipo de documento')) slot.tipo = i;
+    else if (base.startsWith('fecha de nacimiento')) slot.nac = i;
+    else if (base.startsWith('foto')) slot.foto = i;
+    else if (base.includes('documento')) slot.doc = i;
+  });
+  const val = (fila, i) => (i >= 0 && i != null ? fila[i] : null);
+  const out = [];
+  filas.forEach((fila, idx) => {
+    const ced = soloDigitos(val(fila, c.ced));
+    if (!ced) return; // fila vacía o sin cédula
+    const hijos = [];
+    Object.keys(hijosCols).map(Number).sort((a, b) => a - b).forEach((n) => {
+      const s = hijosCols[n];
+      const nombre = texto(val(fila, s.nombre));
+      const docRaw = texto(val(fila, s.doc));
+      const nacRaw = val(fila, s.nac);
+      if (!nombre && !docRaw && (nacRaw == null || nacRaw === '')) return; // bloque sin llenar
+      hijos.push({
+        n, nombre,
+        genero: texto(val(fila, s.genero)),
+        tipo: texto(val(fila, s.tipo)),
+        docRaw, doc: soloDigitos(val(fila, s.doc)),
+        nacMs: soloDia(aMs(nacRaw)), nacRaw: texto(nacRaw),
+        foto: extraerLink(val(fila, s.foto)),
+      });
+    });
+    out.push({
+      id: Number(val(fila, c.id)) || idx + 1,
+      fin: aMs(val(fila, c.fin)),
+      ced, cedRaw: texto(val(fila, c.ced)),
+      nombre: texto(val(fila, c.nombre)),
+      correo: texto(val(fila, c.correo)),
+      sede: texto(val(fila, c.sede)),
+      tieneHijos: normTxt(val(fila, c.tiene)).startsWith('s'),
+      hijos,
+    });
+  });
+  return out;
+}
+
+// La foto puede venir como link directo o como texto JSON de Forms [{"name":..,"link":..}]
+function extraerLink(v) {
+  const s = texto(v);
+  if (!s) return '';
+  if (s.startsWith('[')) { try { const j = JSON.parse(s); return j?.[0]?.link || ''; } catch (e) { /* sigue */ } }
+  const m = s.match(/https?:\/\/\S+/);
+  return m ? m[0] : '';
+}
+
+function leerMaestro(enc, filas) {
+  const col = (nombre) => enc.indexOf(nombre);
+  const c = {
+    ced: col('empleado'), nombre: col('nombre del empleado'), sede: col('descripcion c.o.'),
+    cargo: col('descripcion del cargo'), celular: col('celular del contacto'), email: col('email del contacto'),
+    retiro: col('fecha retiro'),
+  };
+  const out = [];
+  filas.forEach((f) => {
+    const ced = soloDigitos(f[c.ced]);
+    if (!ced) return;
+    out.push({
+      ced,
+      nombre: texto(f[c.nombre]),
+      sede: texto(f[c.sede]) || 'SIN SEDE',
+      cargo: texto(f[c.cargo]),
+      celular: texto(f[c.celular]),
+      email: texto(f[c.email]),
+      retiro: c.retiro >= 0 ? aMs(f[c.retiro]) : null,
+    });
+  });
+  return out;
+}
+
+/* =====================================================================
+   4. REGLAS DEL REGISTRO
+   Toma respuestas + maestro + decisiones de revisión y devuelve cada
+   niño con su estado:
+     aprobado  -> recibe regalo
+     revisar   -> caso raro, alguien debe llamar y decidir
+     retirado  -> el colaborador no está en el maestro (retirado o cédula mal digitada)
+     rechazado -> no cumple la edad, o ya lo inscribió otra persona
+   Orden en que se aplican:
+     1. Reenvíos: la ÚLTIMA respuesta de cada colaborador reemplaza a las
+        anteriores. Un niño que solo estaba en una respuesta anterior va a
+        revisar (puede ser un documento corregido o un niño olvidado).
+     2. Edad: nacido antes del 01/01/2016 -> rechazado.
+     3. Mismo niño inscrito por dos colaboradores (pareja): se queda con el
+        PRIMERO que lo inscribió (prefiriendo al que está en el maestro).
+     4. Colaborador que no está en el maestro -> retirado.
+     5. Alertas para revisar (documento igual a la cédula, dígitos raros,
+        nombre casi igual a un hermano, sin fecha, etc.).
+     6. Si hay una decisión de revisión (Aprobar / No aprobar), esa manda.
+   ===================================================================== */
+function procesar(datos, decisiones, fechaEntregaIso) {
+  const corte = aMs(fechaEntregaIso) ?? aMs(CONFIG.fechaEntregaPorDefecto);
+  const minNac = aMs(CONFIG.nacidosDesde);
+  const maestro = new Map(datos.maestro.map((m) => [m.ced, m]));
+
+  // --- 4.1 Agrupar respuestas por cédula y ordenarlas en el tiempo
+  const porCed = new Map();
+  for (const r of datos.respuestas) {
+    if (!porCed.has(r.ced)) porCed.set(r.ced, []);
+    porCed.get(r.ced).push(r);
+  }
+
+  const ninos = [];
+  const colaboradores = new Map(); // cédula -> resumen del colaborador que respondió
+  for (const [ced, lista] of porCed) {
+    lista.sort((a, b) => (a.fin ?? 0) - (b.fin ?? 0) || a.id - b.id);
+    const ultima = lista[lista.length - 1];
+    const m = maestro.get(ced);
+    const enMaestro = !!m && m.retiro == null;
+    colaboradores.set(ced, {
+      ced, enMaestro, m, ultima, respuestas: lista.length,
+      nombre: m ? m.nombre : ultima.nombre, sede: enMaestro ? m.sede : ultima.sede,
+    });
+
+    // Primera vez que este colaborador inscribió cada documento (para "el primero gana")
+    const primeraVez = new Map();
+    for (const r of lista) for (const h of r.hijos) if (h.doc && !primeraVez.has(h.doc)) primeraVez.set(h.doc, r.fin ?? 0);
+
+    const agregar = (r, h, origen) => {
+      const edad = h.nacMs != null ? edadEn(h.nacMs, corte) : null;
+      ninos.push({
+        key: `${ced}|${h.doc || `sin-doc-${r.id}-${h.n}`}`,
+        ced, cedDigitada: r.cedRaw,
+        colaborador: nombrePropio(m ? m.nombre : r.nombre),
+        nombreForms: r.nombre,
+        sede: enMaestro ? m.sede : (r.sede || 'SIN SEDE'),
+        sedeForms: r.sede,
+        cargo: m ? m.cargo : '',
+        celular: m ? m.celular : '',
+        correo: r.correo,
+        enMaestro, retiroMs: m?.retiro ?? null,
+        nino: nombrePropio(h.nombre),
+        genero: h.genero, g: generoCorto(h.genero),
+        tipoDoc: h.tipo, doc: h.doc, docDigitado: h.docRaw,
+        nacMs: h.nacMs, nacRaw: h.nacRaw,
+        edad, rango: edad != null && edad >= 0 && edad <= CONFIG.edadMax ? rangoDe(edad) : null,
+        foto: h.foto,
+        respId: r.id, respFin: r.fin,
+        primeraVez: h.doc ? primeraVez.get(h.doc) : (r.fin ?? 0),
+        origen, numHijo: h.n,
+        revisar: [], rechazo: null, estadoBase: '', estado: '', decision: null,
+      });
+    };
+
+    // Niños de la última respuesta (si un documento sale dos veces en la misma respuesta, cuenta una)
+    const vistos = new Set();
+    for (const h of ultima.hijos) {
+      if (h.doc && vistos.has(h.doc)) continue;
+      if (h.doc) vistos.add(h.doc);
+      agregar(ultima, h, 'ultima');
+    }
+    // Niños que solo estaban en respuestas anteriores (si salen en varias, se toma la más reciente)
+    const anteriores = new Map();
+    for (const r of lista.slice(0, -1)) {
+      for (const h of r.hijos) {
+        if (h.doc && vistos.has(h.doc)) continue;
+        anteriores.set(h.doc || `sin-${r.id}-${h.n}`, { r, h });
+      }
+    }
+    for (const { r, h } of anteriores.values()) agregar(r, h, 'anterior');
+  }
+
+  // --- 4.2 Edad, documento y datos básicos
+  for (const k of ninos) {
+    if (k.nacMs == null) k.revisar.push('Fecha de nacimiento vacía o no válida' + (k.nacRaw ? ` ("${k.nacRaw}")` : ''));
+    else if (k.nacMs < minNac) k.rechazo = `Nació antes del 01/01/2016 (${fmtFecha(k.nacMs)}): no cumple la edad`;
+    else if (k.nacMs > corte) k.revisar.push(`Fecha de nacimiento (${fmtFecha(k.nacMs)}) posterior a la fecha de entrega`);
+    if (!k.nino) k.revisar.push('Falta el nombre del niño');
+    if (!k.doc) k.revisar.push('Falta el número de documento del niño');
+    else {
+      if (k.doc === k.ced) k.revisar.push('El documento del niño es igual a la cédula del colaborador');
+      if (k.doc.length < CONFIG.digitosDocMin || k.doc.length > CONFIG.digitosDocMax) k.revisar.push(`Documento con ${k.doc.length} dígitos (lo normal es ${CONFIG.digitosDocMin} u ${CONFIG.digitosDocMax})`);
+    }
+    if (k.origen === 'anterior') k.revisar.push(`Estaba en una respuesta anterior (Id ${k.respId}) y no en la última`);
+  }
+
+  // --- 4.3 Mismo niño inscrito por dos colaboradores distintos (pareja)
+  const porDoc = new Map();
+  for (const k of ninos) {
+    if (!k.doc || k.rechazo) continue;
+    if (!porDoc.has(k.doc)) porDoc.set(k.doc, []);
+    porDoc.get(k.doc).push(k);
+  }
+  for (const grupo of porDoc.values()) {
+    if (grupo.length < 2) continue;
+    grupo.sort((a, b) => (b.enMaestro - a.enMaestro) || (a.primeraVez - b.primeraVez));
+    const gana = grupo[0];
+    for (const otro of grupo.slice(1)) {
+      otro.rechazo = `Ya lo inscribió ${gana.colaborador} (CC ${gana.ced}, ${gana.sede}). Si son pareja, solo cuenta una vez`;
+      otro.duplicadoDe = gana.key;
+    }
+  }
+
+  // --- 4.4 Posible hermano repetido con otro documento (mismo colaborador)
+  const porColab = new Map();
+  for (const k of ninos) { if (!porColab.has(k.ced)) porColab.set(k.ced, []); porColab.get(k.ced).push(k); }
+  for (const lista of porColab.values()) {
+    for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
+      const a = lista[i], b = lista[j];
+      if (a.rechazo || b.rechazo || a.doc === b.doc || !a.nino || !b.nino) continue;
+      // Los hermanos comparten apellidos, así que solo se alerta si el nombre es idéntico,
+      // o si es casi igual Y tienen la misma fecha de nacimiento (mismo niño con documento corregido)
+      // Se comparan los nombres SIN las palabras que comparten (los apellidos): así los mellizos
+      // "Martín" y "Matías" no se confunden, pero "Matias" y "Matías" sí.
+      const ta = normTxt(a.nino).split(' '), tb = normTxt(b.nino).split(' ');
+      const restoA = ta.filter((t) => !tb.includes(t)).join(' '), restoB = tb.filter((t) => !ta.includes(t)).join(' ');
+      const mismoNombre = restoA === restoB;
+      const mismaFecha = a.nacMs != null && a.nacMs === b.nacMs;
+      if (mismoNombre || (mismaFecha && similitud(restoA, restoB) >= CONFIG.similitudNombre)) {
+        b.revisar.push(`Parece el mismo niño que "${a.nino}" (doc ${a.doc || 'sin doc'}) con otro documento`);
+      }
+    }
+  }
+
+  // --- 4.5 Estado base y decisiones de revisión
+  for (const k of ninos) {
+    if (k.rechazo) k.estadoBase = 'rechazado';
+    else if (!k.enMaestro) k.estadoBase = 'retirado';
+    else if (k.revisar.length) k.estadoBase = 'revisar';
+    else k.estadoBase = 'aprobado';
+    const d = decisiones[k.key];
+    if (d && d.d) {
+      k.decision = d;
+      k.estado = d.d === 'OK' ? 'aprobado' : 'rechazado';
+      // "Entregar a nombre de": el niño pasa al colaborador correcto del maestro
+      // (caso típico: en el Forms pusieron la cédula del niño en vez de la del papá o la mamá)
+      const nuevo = d.d === 'OK' && d.asignarA ? maestro.get(d.asignarA) : null;
+      if (nuevo) {
+        k.reasignadoDe = `${k.colaborador} (CC ${k.ced})`;
+        Object.assign(k, { ced: nuevo.ced, colaborador: nombrePropio(nuevo.nombre), sede: nuevo.sede, cargo: nuevo.cargo, celular: nuevo.celular, enMaestro: true });
+      }
+    } else k.estado = k.estadoBase;
+  }
+
+  // --- 4.6 Para los que no están en el maestro: buscar parecidos (cédula o nombre)
+  const tokensMaestro = datos.maestro.map((m) => ({ m, t: new Set(tokensNombre(m.nombre)) }));
+  const sugerencias = new Map();
+  for (const c of colaboradores.values()) {
+    if (c.enMaestro) continue;
+    // Cada persona del maestro que se parezca junta sus pistas: cédula parecida, mismo correo, mismo nombre
+    const pistas = new Map(); // cédula del maestro -> { m, por: [] }
+    const anotar = (m, por) => { if (!pistas.has(m.ced)) pistas.set(m.ced, { m, por: [] }); pistas.get(m.ced).por.push(por); };
+    for (const m of datos.maestro) {
+      if (m.ced !== c.ced && Math.abs(m.ced.length - c.ced.length) <= 1 && levenshtein(m.ced, c.ced) <= 1) anotar(m, 'cédula parecida');
+    }
+    // Mismo correo personal (útil cuando digitaron la cédula de otra persona, por ejemplo la del niño)
+    const correo = normTxt(c.ultima.correo);
+    if (correo.includes('@')) {
+      for (const m of datos.maestro) if (m.ced !== c.ced && normTxt(m.email) === correo) anotar(m, 'mismo correo');
+    }
+    const t = tokensNombre(c.ultima.nombre);
+    if (t.length >= 2) {
+      for (const { m, t: tm } of tokensMaestro) {
+        if (m.ced === c.ced) continue;
+        const comunes = t.filter((x) => tm.has(x)).length;
+        if (comunes >= Math.min(3, t.length) && comunes >= 2) anotar(m, 'mismo nombre');
+      }
+    }
+    // Primero las personas con más pistas; máximo 3
+    const mejores = [...pistas.values()].sort((a, b) => b.por.length - a.por.length).slice(0, 3);
+    const s = mejores.map(({ m, por }) => `Posible: CC ${m.ced}, ${nombrePropio(m.nombre)} (${m.sede}). Coincide: ${por.join(', ')}`);
+    if (c.m && c.m.retiro != null) s.unshift(`Está en el maestro con fecha de retiro ${fmtFecha(c.m.retiro)}`);
+    sugerencias.set(c.ced, { textos: s, candidatos: mejores.map(({ m }) => ({ ced: m.ced, nombre: nombrePropio(m.nombre), sede: m.sede })) });
+  }
+  for (const k of ninos) {
+    // Se busca por la cédula original (antes de una posible reasignación)
+    const sug = sugerencias.get(k.key.split('|')[0]);
+    k.sugerencias = sug ? sug.textos : [];
+    k.candidatos = sug ? sug.candidatos : [];
+  }
+
+  // --- 4.7 Colaboradores activos que no han respondido el Forms
+  // (quien recibió un niño reasignado en la revisión ya cuenta como inscrito)
+  const reasignados = new Set(ninos.filter((k) => k.reasignadoDe).map((k) => k.ced));
+  const sinInscribir = datos.maestro
+    .filter((m) => m.retiro == null && !porCed.has(m.ced) && !reasignados.has(m.ced))
+    .map((m) => ({ ...m, nombreP: nombrePropio(m.nombre) }));
+
+  // --- 4.8 Lista de sedes (maestro + las que salen en las respuestas)
+  const sedes = [...new Set([...datos.maestro.filter((m) => m.retiro == null).map((m) => m.sede), ...ninos.map((k) => k.sede)])]
+    .sort((a, b) => a.localeCompare(b, 'es'));
+
+  return { ninos, colaboradores, sinInscribir, sedes, maestroActivo: datos.maestro.filter((m) => m.retiro == null), corte };
+}
+
+// Conteos para el resumen y para compras (sobre una lista de niños aprobados)
+function contar(aprobados) {
+  const porEdad = Array.from({ length: CONFIG.edadMax + 1 }, () => ({ F: 0, M: 0, O: 0 }));
+  const porRango = Object.fromEntries(CONFIG.rangos.map((r) => [r.id, { F: 0, M: 0, O: 0 }]));
+  for (const k of aprobados) {
+    if (k.edad != null && k.edad >= 0 && k.edad <= CONFIG.edadMax) porEdad[k.edad][k.g]++;
+    if (k.rango) porRango[k.rango.id][k.g]++;
+  }
+  return { porEdad, porRango };
+}
+const totalG = (o) => o.F + o.M + o.O;
+
+/* =====================================================================
+   5. ARCHIVO DE REVISIONES (JSON)
+   Es la "memoria" que se pasan entre ustedes. Guarda solo las decisiones:
+     clave (cédula|documento niño) -> { d: 'OK' | 'NO' | null, motivo, por, fecha }
+   d = null significa "decisión quitada" (para que al juntar archivos
+   también se propague que se quitó).
+   Si se pone clave, el contenido va cifrado con AES-GCM 256 y la clave
+   se deriva con PBKDF2 (310.000 iteraciones). Sin la clave no se puede leer.
+   ===================================================================== */
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const aB64 = (buf) => { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+const deB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function derivarLlave(clave, salt, iter) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(clave), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+async function armarJsonRevisiones(decisiones, clave, por, compras) {
+  const cuerpo = { decisiones, compras }; // compras = presupuesto, catálogo y plan de compra
+  const meta = { tipo: 'regalos-navidad-revisiones', version: 1, anio: CONFIG.anio, generado: new Date().toISOString(), por: por || '' };
+  if (!clave) return JSON.stringify({ ...meta, cifrado: false, ...cuerpo }, null, 1);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const llave = await derivarLlave(clave, salt, CONFIG.iteracionesClave);
+  const datos = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, llave, enc.encode(JSON.stringify(cuerpo)));
+  return JSON.stringify({ ...meta, cifrado: true, kdf: 'PBKDF2-SHA256', iter: CONFIG.iteracionesClave, salt: aB64(salt), iv: aB64(iv), datos: aB64(datos) });
+}
+
+async function abrirJsonRevisiones(textoJson, clave) {
+  let j;
+  try { j = JSON.parse(textoJson); } catch (e) { throw new Error('El archivo no es un JSON válido.'); }
+  if (j.tipo !== 'regalos-navidad-revisiones') throw new Error('Este JSON no es un archivo de revisiones de esta herramienta.');
+  // Devuelve { decisiones, compras } (los archivos viejos no traen compras)
+  if (!j.cifrado) return { decisiones: j.decisiones || {}, compras: j.compras || null };
+  if (!clave) { const e = new Error('Este archivo tiene clave.'); e.necesitaClave = true; throw e; }
+  try {
+    const llave = await derivarLlave(clave, deB64(j.salt), j.iter || CONFIG.iteracionesClave);
+    const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64(j.iv) }, llave, deB64(j.datos));
+    const cuerpo = JSON.parse(dec.decode(plano));
+    return { decisiones: cuerpo.decisiones || {}, compras: cuerpo.compras || null };
+  } catch (e) {
+    const err = new Error('La clave no es correcta.'); err.necesitaClave = true; err.claveMala = true; throw err;
+  }
+}
+
+// Junta dos conjuntos de decisiones: por cada niño gana la decisión más reciente
+function fusionarDecisiones(actual, nuevas) {
+  const out = { ...actual };
+  let cambios = 0;
+  for (const [k, d] of Object.entries(nuevas || {})) {
+    if (!d || !d.fecha) continue;
+    if (!out[k] || (out[k].fecha || '') < d.fecha) { out[k] = d; cambios++; }
+  }
+  return { decisiones: out, cambios };
+}
+
+/* =====================================================================
+   6. COLUMNAS DE LOS LISTADOS
+   Las mismas columnas sirven para la tabla en pantalla y para el Excel.
+   ui:false = solo va en el Excel.
+   ===================================================================== */
+const decisionTexto = (k) => (k.decision ? (k.decision.d === 'OK' ? 'Aprobado en revisión' : 'No aprobado en revisión') : '');
+const motivoEstado = (k) => {
+  if (k.decision) return k.decision.motivo || decisionTexto(k);
+  if (k.estadoBase === 'rechazado') return k.rechazo;
+  if (k.estadoBase === 'retirado') return 'La cédula no está en el maestro (retirado o mal digitada)';
+  return k.revisar.join(' | ');
+};
+
+const C = {
+  sede:        { id: 'sede', label: 'Sede', valor: (k) => k.sede },
+  ced:         { id: 'ced', label: 'Cédula', valor: (k) => k.ced, mono: true },
+  colaborador: { id: 'colaborador', label: 'Colaborador', valor: (k) => k.colaborador, wrap: true },
+  cargo:       { id: 'cargo', label: 'Cargo', valor: (k) => k.cargo, wrap: true },
+  nino:        { id: 'nino', label: 'Niño(a)', valor: (k) => k.nino, wrap: true },
+  doc:         { id: 'doc', label: 'Documento niño', valor: (k) => k.doc || k.docDigitado, mono: true },
+  tipoDoc:     { id: 'tipoDoc', label: 'Tipo de documento', valor: (k) => k.tipoDoc, ui: false },
+  genero:      { id: 'genero', label: 'Género', valor: (k) => k.genero },
+  nac:         { id: 'nac', label: 'Fecha de nacimiento', valor: (k) => fmtFecha(k.nacMs) || k.nacRaw, orden: (k) => k.nacMs ?? 0, mono: true },
+  edad:        { id: 'edad', label: 'Edad', valor: (k) => (k.edad ?? ''), num: true },
+  rango:       { id: 'rango', label: 'Rango de edad', valor: (k) => k.rango?.label || '' },
+  sedeForms:   { id: 'sedeForms', label: 'Sede en el Forms', valor: (k) => (k.sedeForms !== k.sede ? k.sedeForms : ''), ui: false },
+  correo:      { id: 'correo', label: 'Correo (Forms)', valor: (k) => k.correo, ui: false },
+  celular:     { id: 'celular', label: 'Celular', valor: (k) => k.celular, ui: false },
+  respId:      { id: 'respId', label: 'Id respuesta Forms', valor: (k) => k.respId, ui: false, num: true },
+  fin:         { id: 'fin', label: 'Fecha de inscripción', valor: (k) => fmtFechaHora(k.respFin), orden: (k) => k.respFin ?? 0, ui: false },
+  foto:        { id: 'foto', label: 'Link documento', valor: (k) => k.foto, ui: false },
+  motivo:      { id: 'motivo', label: 'Motivo', valor: motivoEstado, ui: false },
+  sugerencia:  { id: 'sugerencia', label: 'Qué se encontró', valor: (k) => [...k.sugerencias, ...k.revisar].join(' | '), ui: false },
+  decision:    { id: 'decisionTxt', label: 'Revisión', valor: decisionTexto, ui: false },
+  reasignado:  { id: 'reasignado', label: 'Inscrito originalmente por', valor: (k) => k.reasignadoDe || '', ui: false },
+  decMotivo:   { id: 'decMotivo', label: 'Motivo de la revisión', valor: (k) => k.decision?.motivo || '', ui: false },
+  decPor:      { id: 'decPor', label: 'Revisado por', valor: (k) => k.decision?.por || '', ui: false },
+  decFecha:    { id: 'decFecha', label: 'Fecha de revisión', valor: (k) => (k.decision?.fecha ? fmtFechaHora(Date.parse(k.decision.fecha) - new Date().getTimezoneOffset() * 60000) : ''), ui: false },
+};
+const COLS_REVISION = [C.decision, C.reasignado, C.decMotivo, C.decPor, C.decFecha];
+
+// Columnas compactas SOLO para pantalla (excel:false): juntan varios datos en una celda
+// para que en las tablas de revisión el "Por qué" y los botones queden a la vista.
+const C_UI = {
+  colab: { id: 'colabUI', label: 'Colaborador', excel: false, wrap: true, orden: (k) => k.colaborador,
+    valor: (k) => `${k.colaborador} ${k.ced} ${k.sede}`,
+    render: (k) => <>{k.colaborador || 'Sin nombre'}<span className="sub">CC {k.ced}</span><span className="sub">{k.sede}</span></> },
+  nino: { id: 'ninoUI', label: 'Niño(a)', excel: false, wrap: true, orden: (k) => k.nino,
+    valor: (k) => `${k.nino} ${k.doc}`,
+    render: (k) => <>{k.nino || <i>Sin nombre</i>}<span className="sub">Doc {k.doc || 'sin documento'}</span><span className="sub">{(fmtFecha(k.nacMs) || k.nacRaw || 'Sin fecha')}{k.edad != null ? `, ${plural(k.edad, 'año', 'años')}` : ''}</span></> },
+};
+const soloExcel = (cols) => cols.map((c) => ({ ...c, ui: false }));
+const COLS_APROBADOS = [C.sede, C.ced, C.colaborador, C.cargo, C.nino, C.doc, C.tipoDoc, C.genero, C.nac, C.edad, C.rango, C.sedeForms, C.respId, C.fin, ...COLS_REVISION];
+const COLS_REVISAR = [C_UI.colab, C_UI.nino, ...soloExcel([C.sede, C.ced, C.colaborador, C.nino, C.doc, C.genero, C.nac, C.edad]), C.motivo, C.foto, C.correo, C.celular, C.respId, C.fin, ...COLS_REVISION];
+const COLS_RETIRADOS = [C_UI.colab, C_UI.nino, ...soloExcel([C.sede, C.ced, C.colaborador, C.nino, C.doc, C.genero, C.nac, C.edad]), C.sugerencia, C.correo, C.foto, C.respId, C.fin, ...COLS_REVISION];
+const COLS_RECHAZADOS = [C_UI.colab, C_UI.nino, ...soloExcel([C.sede, C.ced, C.colaborador, C.nino, C.doc, C.genero, C.nac, C.edad]), C.motivo, C.foto, C.respId, C.fin, ...COLS_REVISION];
+const COLS_SIN = [
+  { id: 'sede', label: 'Sede', valor: (m) => m.sede },
+  { id: 'ced', label: 'Cédula', valor: (m) => m.ced, mono: true },
+  { id: 'nombre', label: 'Nombre', valor: (m) => m.nombreP, wrap: true },
+  { id: 'cargo', label: 'Cargo', valor: (m) => m.cargo, wrap: true },
+  { id: 'celular', label: 'Celular', valor: (m) => m.celular, mono: true },
+  { id: 'email', label: 'Correo', valor: (m) => m.email, ui: false },
+];
+
+/* =====================================================================
+   7. EXPORTAR A EXCEL
+   ===================================================================== */
+function hojaDesde(filas, todas) {
+  const columnas = todas.filter((c) => c.excel !== false); // las columnas compactas de pantalla no van al Excel
+  const datos = filas.map((f) => Object.fromEntries(columnas.map((c) => [c.label, c.valor(f)])));
+  const ws = XLSX.utils.json_to_sheet(datos, { header: columnas.map((c) => c.label) });
+  // Ancho de columna según el contenido (máximo 60 caracteres)
+  ws['!cols'] = columnas.map((c) => ({ wch: Math.min(60, Math.max(c.label.length + 2, ...datos.slice(0, 400).map((d) => String(d[c.label] ?? '').length + 1))) }));
+  if (datos.length) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: datos.length, c: columnas.length - 1 } }) };
+  return ws;
+}
+function hojaTabla(filasArr, formatos = {}) { // filasArr: arreglo de arreglos (incluye encabezado)
+  const ws = XLSX.utils.aoa_to_sheet(filasArr);
+  // formatos: { índice de columna: formato de Excel }, ej. { 3: '"$"#,##0', 2: '0%' }
+  for (let r = 1; r < filasArr.length; r++) {
+    for (const [c, z] of Object.entries(formatos)) {
+      const cel = ws[XLSX.utils.encode_cell({ r, c: +c })];
+      if (cel && cel.t === 'n') cel.z = z;
+    }
+  }
+  ws['!cols'] = filasArr[0].map((_, i) => ({ wch: Math.min(40, Math.max(...filasArr.map((f) => String(f[i] ?? '').length + 2))) }));
+  return ws;
+}
+function descargarLibro(hojas, nombreArchivo) {
+  const wb = XLSX.utils.book_new();
+  hojas.forEach(({ nombre, ws }) => XLSX.utils.book_append_sheet(wb, ws, nombre.slice(0, 31)));
+  XLSX.writeFile(wb, nombreArchivo);
+}
+
+// Tablas de conteo para compras
+function filasCompras(aprobados, sedes) {
+  const out = [['Sede', 'Rango de edad', 'Femenino', 'Masculino', 'Sin género', 'Total']];
+  const tot = { F: 0, M: 0, O: 0 };
+  for (const s of sedes) {
+    const { porRango } = contar(aprobados.filter((k) => k.sede === s));
+    for (const r of CONFIG.rangos) {
+      const v = porRango[r.id];
+      if (!totalG(v)) continue;
+      out.push([s, r.label, v.F, v.M, v.O, totalG(v)]);
+    }
+  }
+  const { porRango } = contar(aprobados);
+  for (const r of CONFIG.rangos) { const v = porRango[r.id]; out.push(['TOTAL', r.label, v.F, v.M, v.O, totalG(v)]); tot.F += v.F; tot.M += v.M; tot.O += v.O; }
+  out.push(['TOTAL', 'Todos', tot.F, tot.M, tot.O, totalG(tot)]);
+  return out;
+}
+function filasPorEdad(aprobados) {
+  const { porEdad } = contar(aprobados);
+  const out = [['Edad', 'Rango', 'Femenino', 'Masculino', 'Sin género', 'Total']];
+  porEdad.forEach((v, e) => out.push([e, rangoDe(e)?.label || '', v.F, v.M, v.O, totalG(v)]));
+  const t = porEdad.reduce((a, v) => ({ F: a.F + v.F, M: a.M + v.M, O: a.O + v.O }), { F: 0, M: 0, O: 0 });
+  out.push(['Total', '', t.F, t.M, t.O, totalG(t)]);
+  return out;
+}
+
+/* =====================================================================
+   8. PLANILLA DE FIRMAS EN PDF
+   Una sección por sede (empieza en hoja nueva), una fila por niño.
+   Si conCampos = true, en cada casilla de firma se agrega un campo de
+   firma digital (se firma con Adobe Acrobat / Reader o en tablet).
+   ===================================================================== */
+async function cargarLogo() {
+  try {
+    const r = await fetch(CONFIG.logoUrl, { mode: 'cors' });
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    const url = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
+    const dim = await new Promise((ok) => { const im = new Image(); im.onload = () => ok({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => ok(null); im.src = url; });
+    return dim ? { url, ...dim } : null;
+  } catch (e) { return null; }
+}
+
+// La fuente del PDF solo trae letras del español y Europa occidental (Latin-1).
+// Cualquier letra fuera de eso (ej. la "ś" de Wiśniewska) se cambia por su letra base
+// para que no salga un símbolo raro.
+const pdfTexto = (s) => String(s ?? '').normalize('NFC').replace(/[^\u0000-ÿ]/g, (ch) => quitarTildes(ch).replace(/[^\u0000-ÿ]/g, '') || '?');
+
+async function generarPlanilla(aprobados, { sedes, corte, conCampos, logo }) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 28;                         // margen
+  const VERDE = [28, 90, 42], TINTA = [5, 32, 11], GRIS = [95, 106, 98];
+  const celdasFirma = [];               // posiciones de las casillas de firma (para los campos digitales)
+
+  const encabezado = (sede, total) => {
+    if (logo) {
+      const h = 34, w = Math.min(170, (logo.w / logo.h) * h);
+      try { doc.addImage(logo.url, 'PNG', W - M - w, 22, w, h); } catch (e) { /* sin logo */ }
+    } else {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...VERDE);
+      doc.text('Supertiendas Cañaveral', W - M, 40, { align: 'right' });
+    }
+    doc.setTextColor(...TINTA); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+    doc.text(`Entrega de regalos de Navidad ${CONFIG.anio}`, M, 38);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...GRIS);
+    doc.text('Hijos de colaboradores. Firma de recibido del colaborador.', M, 54);
+    doc.setTextColor(...TINTA); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    // Si el nombre de la sede es muy largo se recorta para no tapar el logo
+    const sedeTxt = doc.splitTextToSize(pdfTexto(`Sede: ${sede}`), W - 2 * M - 190)[0];
+    doc.text(sedeTxt, M, 78);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text(`Niños en esta planilla: ${total}     Fecha de entrega: ____ / ____ / ${CONFIG.anio}`, M, 94);
+    doc.setDrawColor(...VERDE); doc.setLineWidth(1.5); doc.line(M, 102, W - M, 102);
+  };
+
+  const ordenadas = sedes.filter((s) => aprobados.some((k) => k.sede === s));
+  if (!ordenadas.length) throw new Error('No hay niños aprobados para generar la planilla.');
+
+  ordenadas.forEach((sede, idx) => {
+    if (idx > 0) doc.addPage();
+    const lista = aprobados.filter((k) => k.sede === sede)
+      .sort((a, b) => a.colaborador.localeCompare(b.colaborador, 'es') || a.nino.localeCompare(b.nino, 'es'));
+    const body = lista.map((k, i) => [
+      i + 1, k.ced, pdfTexto(k.colaborador), pdfTexto(nombrePropio(k.cargo)), pdfTexto(k.nino),
+      k.g === 'F' ? 'F' : k.g === 'M' ? 'M' : '-',
+      k.edad != null ? `${k.edad} ${k.edad === 1 ? 'año' : 'años'}\n(${k.rango?.label || ''})` : '',
+      '', '',
+    ]);
+    encabezado(sede, lista.length);
+    doc.autoTable({
+      startY: 112,
+      margin: { left: M, right: M, top: 112, bottom: 40 },
+      head: [['N°', 'Cédula', 'Colaborador', 'Cargo', 'Niño(a)', 'Gén.', 'Edad', 'Firma del colaborador', 'Fecha']],
+      body,
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 4, valign: 'middle', textColor: TINTA, lineColor: [200, 206, 201], lineWidth: 0.5, minCellHeight: 30, overflow: 'linebreak' },
+      headStyles: { fillColor: VERDE, textColor: 255, fontStyle: 'bold', minCellHeight: 20 },
+      alternateRowStyles: { fillColor: [247, 249, 246] },
+      columnStyles: {
+        0: { cellWidth: 26, halign: 'center' }, 1: { cellWidth: 66 }, 2: { cellWidth: 150 }, 3: { cellWidth: 100 },
+        4: { cellWidth: 140 }, 5: { cellWidth: 30, halign: 'center' }, 6: { cellWidth: 66, fontSize: 7.5 },
+        7: { cellWidth: 108 }, 8: { cellWidth: 50 },
+      },
+      showHead: 'everyPage',
+      rowPageBreak: 'avoid',
+      didDrawPage: (data) => { if (data.pageNumber > 1) encabezado(sede, lista.length); },
+      didDrawCell: (data) => {
+        if (data.section === 'body' && data.column.index === 7) {
+          celdasFirma.push({
+            page: doc.internal.getCurrentPageInfo().pageNumber,
+            x: data.cell.x, y: data.cell.y, w: data.cell.width, h: data.cell.height,
+            nombre: `Firma_${slug(sede)}_${String(data.row.index + 1).padStart(3, '0')}`,
+          });
+        }
+      },
+    });
+    // Cierre de la sede: quién entregó
+    let y = doc.lastAutoTable.finalY + 34;
+    if (y > H - 60) { doc.addPage(); encabezado(sede, lista.length); y = 150; }
+    doc.setFontSize(10); doc.setTextColor(...TINTA);
+    doc.text('Entregado por (nombre): ______________________________________', M, y);
+    doc.text('Firma: ____________________________', W / 2 + 40, y);
+  });
+
+  // Pie de página con número de hoja
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(...GRIS);
+    doc.text(`${CONFIG.empresa} - Gestión Humana - Regalos de Navidad ${CONFIG.anio}`, M, H - 18);
+    doc.text(`Hoja ${i} de ${n}`, W - M, H - 18, { align: 'right' });
+  }
+
+  let bytes = doc.output('arraybuffer');
+  if (conCampos) bytes = await agregarCamposFirma(bytes, celdasFirma);
+  return bytes;
+}
+
+// Agrega un campo de firma digital (/FT /Sig) sobre cada casilla "Firma del colaborador"
+async function agregarCamposFirma(bytes, celdas) {
+  const { PDFDocument, PDFString } = PDFLib;
+  const pdf = await PDFDocument.load(bytes);
+  const ctx = pdf.context;
+  const acro = pdf.catalog.getOrCreateAcroForm();
+  const paginas = pdf.getPages();
+  const usados = new Set();
+  for (const c of celdas) {
+    const page = paginas[c.page - 1];
+    if (!page) continue;
+    const alto = page.getHeight();
+    let nombre = c.nombre, i = 2;
+    while (usados.has(nombre)) nombre = `${c.nombre}_${i++}`; // nombres únicos
+    usados.add(nombre);
+    const p = 3; // margen interno para que el campo no tape la línea de la tabla
+    const campo = ctx.obj({
+      Type: 'Annot', Subtype: 'Widget', FT: 'Sig', F: 4,
+      T: PDFString.of(nombre),
+      Rect: [c.x + p, alto - (c.y + c.h) + p, c.x + c.w - p, alto - c.y - p],
+      P: page.ref,
+    });
+    const ref = ctx.register(campo);
+    page.node.addAnnot(ref);
+    acro.addField(ref);
+  }
+  return pdf.save();
+}
+
+function descargarBytes(bytes, nombre, tipo) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: tipo }));
+  const a = document.createElement('a');
+  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/* =====================================================================
+   8B. PRESUPUESTO Y PLAN DE COMPRA DE JUGUETES
+   - Catálogo: lista de juguetes con su edad (del catálogo del proveedor)
+     y precio. Viene uno de base y se puede cargar otro desde Excel.
+   - Estimado: reparte el presupuesto entre los rangos de edad de forma
+     PROPORCIONAL a cuántos niños hay en cada rango, y sugiere qué
+     juguetes comprar con esa plata.
+   - Plan real: ustedes escogen en cada rango qué juguetes y cuántas
+     unidades; la app compara contra los niños y contra el presupuesto.
+   Nada de esto tiene datos personales, por eso sí se guarda en el
+   navegador (y también viaja en el archivo JSON compartido).
+   ===================================================================== */
+const PRESUPUESTO_BASE = 50000000;
+// Catálogo inicial (archivo juguetes_1.xlsx). edadMin/edadMax: edades del catálogo.
+const CATALOGO_BASE = [
+  { codigo: '42051', nombre: 'Coche de erizo', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 69920 },
+  { codigo: '38766', nombre: 'Primeros bloques', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 42920 },
+  { codigo: '45112', nombre: 'Primer kit médico', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 69930 },
+  { codigo: '34915', nombre: 'Mini balde', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 31920 },
+  { codigo: '43975', nombre: 'Play-Doh confitería', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 55920 },
+  { codigo: '45539', nombre: 'Mesa proyector Uninex', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 55920 },
+  { codigo: '43730', nombre: 'Juego el tiburón pirata', edadTxt: '4 a 6', edadMin: 4, edadMax: 6, precio: 69920 },
+  { codigo: '41878', nombre: 'Adivina quién', edadTxt: '4 a 6', edadMin: 4, edadMax: 6, precio: 87920 },
+  { codigo: '23099', nombre: 'Monopolio Tío Rico', edadTxt: '7 a 9', edadMin: 7, edadMax: 9, precio: 59920 },
+  { codigo: '43948', nombre: 'Conecta', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 64930 },
+  { codigo: '43729', nombre: 'Juego Rummy', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 39920 },
+  { codigo: '28500', nombre: 'Bop It', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 67920 },
+];
+const comprasIniciales = () => ({ total: PRESUPUESTO_BASE, pct: 100, incluirPendientes: false, catalogo: CATALOGO_BASE, plan: {}, fecha: '' });
+
+const fmtCOP = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.round(n || 0));
+
+// "1 a 3" -> {1,3}; "10" -> {10,10}; "4-6" -> {4,6}
+function edadCatalogo(v) {
+  const nums = String(v ?? '').match(/\d+/g);
+  if (!nums) return null;
+  const a = +nums[0], b = +(nums[1] ?? nums[0]);
+  return { edadMin: Math.min(a, b), edadMax: Math.max(a, b), edadTxt: a === b ? String(a) : `${Math.min(a, b)} a ${Math.max(a, b)}` };
+}
+
+// Texto de un grupo de edades: [1] -> "1 año"; [2,3] -> "2 y 3 años"; [5,6,7] -> "5 a 7 años"
+const textoEdades = (a, b) => (a === b ? (a === 1 ? '1 año' : `${a} años`) : b === a + 1 ? `${a} y ${b} años` : `${a} a ${b} años`);
+
+// Arma los GRUPOS DE EDAD dentro de cada rango de la app según el catálogo.
+// Cada niño solo puede recibir juguetes cuya edad del catálogo incluya SU edad.
+// Ejemplo con el catálogo base, rango 2 a 4: "2 y 3 años" (juguetes de 1 a 3) y "4 años" (juguetes de 4 a 6).
+// Edades seguidas que tienen exactamente los mismos juguetes quedan en el mismo grupo.
+function armarGruposEdad(catalogo) {
+  const grupos = [];
+  for (const r of CONFIG.rangos) {
+    let actual = null;
+    for (let e = r.min; e <= r.max; e++) {
+      const sirven = catalogo.filter((t) => t.edadMin <= e && e <= t.edadMax);
+      const clave = sirven.map((t) => t.codigo).sort().join(',');
+      if (actual && actual.clave === clave) actual.hasta = e;
+      else { actual = { rango: r, desde: e, hasta: e, clave, sirven }; grupos.push(actual); }
+    }
+  }
+  return grupos.map((g) => ({
+    ...g,
+    id: `${g.rango.id}:${g.desde}-${g.hasta}`,          // así se guarda el plan de cada grupo
+    label: textoEdades(g.desde, g.hasta),
+    // Edades del catálogo de las que salen los juguetes del grupo (para mostrar)
+    edadesCatalogo: [...new Set(g.sirven.map((t) => t.edadTxt))].join(' / '),
+  }));
+}
+
+// Grupos (edad + rango) donde se usa un juguete, para mostrarlo en el catálogo
+const usosDeJuguete = (t, grupos) => grupos.filter((g) => g.sirven.some((x) => x.codigo === t.codigo));
+
+// Lee un catálogo desde Excel: busca la fila con "descripcion" y "precio".
+// La columna "edad" puede venir solo en la primera fila de cada grupo (celdas combinadas): se arrastra hacia abajo.
+async function leerCatalogoExcel(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  for (const nombreHoja of wb.SheetNames) {
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], { header: 1, raw: true, defval: null, blankrows: false });
+    for (let f = 0; f < Math.min(15, filas.length); f++) {
+      const enc = (filas[f] || []).map(normTxt);
+      const cDesc = enc.findIndex((h) => h.startsWith('descripcion') || h === 'juguete' || h === 'nombre');
+      const cPrecio = enc.findIndex((h) => h.startsWith('precio') || h.startsWith('valor'));
+      if (cDesc < 0 || cPrecio < 0) continue;
+      const cEdad = enc.findIndex((h) => h.startsWith('edad'));
+      const cCod = enc.findIndex((h) => h.startsWith('codigo'));
+      const out = [];
+      const codigosVistos = new Set(); // si un código se repite en el Excel, se le agrega una letra para no confundirlos
+      let edad = null;
+      filas.slice(f + 1).forEach((fila, i) => {
+        if (cEdad >= 0 && fila[cEdad] != null && String(fila[cEdad]).trim() !== '') edad = edadCatalogo(fila[cEdad]);
+        const nombre = texto(fila[cDesc]);
+        const precio = Number(String(fila[cPrecio] ?? '').replace(/[^\d.]/g, ''));
+        if (!nombre || !precio) return;
+        let codigo = texto(fila[cCod]) || `J${i + 1}`;
+        if (codigosVistos.has(codigo)) codigo = `${codigo}-${i + 1}`;
+        codigosVistos.add(codigo);
+        out.push({
+          codigo,
+          nombre: nombre.charAt(0).toLocaleUpperCase('es') + nombre.slice(1),
+          precio: Math.round(precio),
+          ...(edad || { edadMin: 0, edadMax: CONFIG.edadMax, edadTxt: 'Todas' }),
+        });
+      });
+      if (out.length) return out;
+    }
+  }
+  throw new Error('No encontré el catálogo en ese Excel. Debe tener columnas "descripcion" y "precio" (y opcional "edad" y "codigo").');
+}
+
+// Sugerencia para un grupo de edad: reparte los niños por igual entre los juguetes que sirven para esa edad.
+// Si no alcanza la plata, quita el juguete más caro y vuelve a repartir. Si ni el más barato
+// alcanza para todos, dice cuántos se pueden comprar.
+function sugerirMezcla(n, plata, juguetes) {
+  if (!n || !juguetes.length) return { items: [], costo: 0, unidades: 0 };
+  let lista = [...juguetes].sort((a, b) => a.precio - b.precio); // del más barato al más caro
+  while (lista.length) {
+    const k = lista.length, base = Math.floor(n / k), resto = n % k;
+    const items = lista.map((t, i) => ({ codigo: t.codigo, cantidad: base + (i < resto ? 1 : 0) })).filter((x) => x.cantidad > 0);
+    const costo = items.reduce((s, x) => s + x.cantidad * lista.find((t) => t.codigo === x.codigo).precio, 0);
+    if (costo <= plata) return { items, costo, unidades: n };
+    lista = lista.slice(0, -1);
+  }
+  const barato = [...juguetes].sort((a, b) => a.precio - b.precio)[0];
+  const u = Math.max(0, Math.floor(plata / barato.precio));
+  return { items: u ? [{ codigo: barato.codigo, cantidad: u }] : [], costo: u * barato.precio, unidades: u };
+}
+
+// Calcula todo el presupuesto por GRUPO DE EDAD (y lo suma por rango de la app):
+//   - Estimado: la plata se reparte en proporción a los niños de cada grupo (igual valor por niño).
+//   - Sugerencia: con esa plata, juguetes del catálogo que sirven para esa edad.
+//   - Plan real: lo que ustedes escogen en cada grupo.
+function calcularPresupuesto(ninosBase, compras) {
+  const aUsar = Math.round((compras.total || 0) * (compras.pct ?? 100) / 100);
+  const porCodigo = new Map(compras.catalogo.map((t) => [t.codigo, t]));
+  const contados = ninosBase.filter((k) => k.rango && k.edad != null);
+  const totalNinos = contados.length;
+  const base = armarGruposEdad(compras.catalogo);
+  const ninosDe = (g) => contados.filter((k) => k.rango.id === g.rango.id && k.edad >= g.desde && k.edad <= g.hasta);
+
+  // Reparto proporcional en pesos enteros: los pesos que sobran por redondeo van a los grupos
+  // con mayor fracción, para que la suma dé EXACTO la plata a usar.
+  const cuentas = base.map((g) => ninosDe(g).length);
+  const exactos = cuentas.map((n) => (totalNinos ? (aUsar * n) / totalNinos : 0));
+  const platas = exactos.map(Math.floor);
+  let resto = totalNinos ? aUsar - platas.reduce((s, x) => s + x, 0) : 0;
+  exactos.map((x, i) => [x - Math.floor(x), i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (resto > 0) { platas[i]++; resto--; } });
+
+  const grupos = base.map((g, idx) => {
+    const ks = ninosDe(g);
+    const n = ks.length;
+    const plata = platas[idx];
+    const sugerencia = sugerirMezcla(n, plata, g.sirven);
+    const filasPlan = (compras.plan[g.id] || []).map((p, i) => {
+      const t = porCodigo.get(p.codigo);
+      const precio = t ? t.precio : 0;
+      return { i, codigo: p.codigo, juguete: t, precio, cantidad: p.cantidad || 0, subtotal: precio * (p.cantidad || 0),
+        sirve: g.sirven.some((x) => x.codigo === p.codigo) }; // false si el juguete no es para esta edad
+    });
+    return {
+      ...g, n, F: ks.filter((k) => k.g === 'F').length, M: ks.filter((k) => k.g === 'M').length,
+      plata, porNino: n ? plata / n : 0, sugerencia, filasPlan,
+      unidades: filasPlan.reduce((s, x) => s + x.cantidad, 0),
+      costo: filasPlan.reduce((s, x) => s + x.subtotal, 0),
+    };
+  });
+
+  // Totales por rango de la app (suma de sus grupos de edad)
+  const suma = (gs, f) => gs.reduce((s, g) => s + f(g), 0);
+  const rangos = CONFIG.rangos.map((r) => {
+    const gs = grupos.filter((g) => g.rango.id === r.id);
+    return {
+      ...r, grupos: gs, n: suma(gs, (g) => g.n), F: suma(gs, (g) => g.F), M: suma(gs, (g) => g.M),
+      plata: suma(gs, (g) => g.plata), costo: suma(gs, (g) => g.costo), unidades: suma(gs, (g) => g.unidades),
+      faltan: suma(gs, (g) => Math.max(0, g.n - g.unidades)),
+      sugCosto: suma(gs, (g) => g.sugerencia.costo), sugUnidades: suma(gs, (g) => g.sugerencia.unidades),
+      conPlan: gs.some((g) => g.filasPlan.length),
+    };
+  });
+  return {
+    aUsar, reserva: (compras.total || 0) - aUsar, totalNinos, sinEdad: ninosBase.length - totalNinos,
+    grupos, rangos, porCodigo,
+    costoPlan: suma(grupos, (g) => g.costo),
+    unidadesPlan: suma(grupos, (g) => g.unidades),
+    // Niños sin juguete en el plan: se cuenta grupo por grupo (lo que sobra para una edad no cubre otra)
+    faltanPlan: suma(grupos, (g) => Math.max(0, g.n - g.unidades)),
+    // Juguetes puestos en un grupo cuya edad no corresponde (por ejemplo de un plan viejo)
+    fueraDeEdad: grupos.flatMap((g) => g.filasPlan.filter((f) => !f.sirve && f.cantidad > 0).map((f) => ({ g, f }))),
+    hayPlan: grupos.some((g) => g.filasPlan.length),
+  };
+}
+
+// Filas para el Excel
+function filasPlanCompra(P) {
+  const out = [['Rango de edad', 'Edades', 'Niños del grupo', 'Código', 'Juguete', 'Edad del catálogo', 'Precio unitario', 'Cantidad', 'Subtotal']];
+  for (const r of P.rangos) {
+    for (const g of r.grupos) {
+      for (const f of g.filasPlan) out.push([r.label, g.label, g.n, f.codigo, f.juguete?.nombre || '(no está en el catálogo)', f.juguete?.edadTxt || '', f.precio, f.cantidad, f.subtotal]);
+      const dif = g.unidades - g.n;
+      out.push([r.label, `Total ${g.label}`, g.n, '', `${g.unidades} juguetes ${dif < 0 ? `(faltan ${-dif})` : dif > 0 ? `(sobran ${dif})` : '(completo)'}`, '', '', g.unidades, g.costo]);
+    }
+    out.push([`TOTAL ${r.label}`, '', r.n, '', r.faltan ? `faltan ${r.faltan}` : 'completo', '', '', r.unidades, r.costo]);
+  }
+  out.push(['TOTAL PLAN', '', P.totalNinos, '', P.faltanPlan ? `faltan juguetes para ${P.faltanPlan} niños` : 'hay juguete para todos', '', '', P.unidadesPlan, P.costoPlan]);
+  out.push(['Presupuesto a usar', '', '', '', '', '', '', '', P.aUsar]);
+  out.push([P.aUsar - P.costoPlan >= 0 ? 'Sobra' : 'Falta', '', '', '', '', '', '', '', Math.abs(P.aUsar - P.costoPlan)]);
+  return out;
+}
+function filasEstimado(P) {
+  const out = [['Rango de edad', 'Edades', 'Juguetes del catálogo para', 'Niños', '% de los niños', 'Plata asignada', 'Valor por niño', 'Sugerencia de compra', 'Unidades sugeridas', 'Costo sugerido', 'Sobra']];
+  for (const g of P.grupos) {
+    out.push([g.rango.label, g.label, g.edadesCatalogo || 'Sin juguetes en el catálogo', g.n, P.totalNinos ? Math.round((g.n / P.totalNinos) * 1000) / 1000 : 0, g.plata, Math.round(g.porNino),
+      g.sugerencia.items.map((x) => `${x.cantidad} x ${P.porCodigo.get(x.codigo)?.nombre}`).join(' | '),
+      g.sugerencia.unidades, g.sugerencia.costo, g.plata - g.sugerencia.costo]);
+  }
+  const s = (f) => P.grupos.reduce((a, g) => a + f(g), 0);
+  out.push(['TOTAL', '', '', P.totalNinos, 1, P.aUsar, P.totalNinos ? Math.round(P.aUsar / P.totalNinos) : 0, '',
+    s((g) => g.sugerencia.unidades), s((g) => g.sugerencia.costo), s((g) => g.plata - g.sugerencia.costo)]);
+  return out;
+}
+
+/* =====================================================================
+   9. DATOS DE PRUEBA (solo con ?dev en la URL)
+   Todo es inventado. Sirve para probar la interfaz sin datos reales:
+   demo (normal), peor caso (nombres larguísimos, documentos raros,
+   1.284 personas en el maestro), uno (un solo niño) y vacío.
+   ===================================================================== */
+function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const NOMBRES_F = ['Valentina', 'Sofía', 'Isabella', 'Mariana', 'Salomé', 'Luciana', 'Antonella', 'Emilia', 'Sara', 'Gabriela'];
+const NOMBRES_M = ['Mateo', 'Jacobo', 'Thiago', 'Samuel', 'Emiliano', 'Martín', 'Santiago', 'Matías', 'Juan José', 'Tomás'];
+const APELLIDOS = ['Gómez', 'Restrepo', 'Valencia', 'Ospina', 'Cardona', 'Mosquera', 'Rincón', 'Arango', 'Quintero', 'Mejía', 'Caicedo', 'Hurtado'];
+const SEDES_DEMO = ['SC Sede Norte', 'SC Sede Sur', 'SC Sede Centro', 'SC Sede Oriente', 'CEDI Principal', 'Sede Administrativa'];
+const CARGOS_DEMO = ['Asesor de experiencia', 'Auxiliar de surtido', 'Cajero', 'Supervisor de piso', 'Auxiliar de bodega', 'Administrador de tienda'];
+
+function generarDev(tipo) {
+  if (tipo === 'vacio') return { respuestas: [], maestro: [{ ced: '1000000001', nombre: 'PERSONA DE PRUEBA', sede: 'SC Sede Norte', cargo: 'Cajero', celular: '', email: '', retiro: null }], archivos: ['(prueba) vacío'] };
+  const r = rng(tipo === 'peor' ? 7 : 3);
+  const pick = (a) => a[Math.floor(r() * a.length)];
+  const sedes = tipo === 'peor' ? [...SEDES_DEMO, 'CC Santiago Plaza Villacolombia Cinemas y Plazoleta de Comidas Segundo Piso'] : SEDES_DEMO;
+  const nMaestro = tipo === 'peor' ? 1284 : tipo === 'uno' ? 3 : 260;
+  const maestro = Array.from({ length: nMaestro }, (_, i) => ({
+    ced: String(1000000000 + i * 7919), nombre: `${pick(APELLIDOS)} ${pick(APELLIDOS)} ${pick([...NOMBRES_F, ...NOMBRES_M])}`.toUpperCase(),
+    sede: pick(sedes), cargo: pick(CARGOS_DEMO).toUpperCase(), celular: '300' + String(1000000 + i), email: `persona${i}@correo.com`, retiro: null,
+  }));
+  const fecha = (a, m, d) => Date.UTC(a, m - 1, d);
+  const hijo = (n, extra = {}) => {
+    const f = r() < 0.5;
+    return { n, nombre: `${pick(f ? NOMBRES_F : NOMBRES_M)} ${pick(APELLIDOS)} ${pick(APELLIDOS)}`, genero: f ? 'Femenino' : 'Masculino', tipo: r() < 0.6 ? 'Registro Civil' : 'Tarjeta de Identidad',
+      docRaw: '', doc: String(1100000000 + Math.floor(r() * 99999999)), nacMs: fecha(2016 + Math.floor(r() * 11), 1 + Math.floor(r() * 12), 1 + Math.floor(r() * 27)), nacRaw: '', foto: 'https://ejemplo.invalid/documento.jpg', ...extra };
+  };
+  const respuestas = [];
+  let id = 1;
+  const resp = (m, hijos, extra = {}) => respuestas.push({ id: id, fin: fecha(2026, 10, 8) + id++ * 3600000, ced: m.ced, cedRaw: m.ced, nombre: nombrePropio(m.nombre), correo: 'correo@ejemplo.com', sede: m.sede, tieneHijos: hijos.length > 0, hijos, ...extra });
+  if (tipo === 'uno') { resp(maestro[0], [hijo(1)]); return { respuestas, maestro, archivos: ['(prueba) uno'] }; }
+  const cantidad = tipo === 'peor' ? 700 : 120;
+  for (let i = 0; i < cantidad; i++) {
+    const m = maestro[i];
+    const nh = r() < 0.12 ? 0 : 1 + Math.floor(r() * (tipo === 'peor' ? 6 : 3));
+    resp(m, Array.from({ length: nh }, (_, j) => hijo(j + 1)));
+  }
+  // Casos especiales que deben caer en cada listado
+  const m0 = maestro[0], m1 = maestro[1], m2 = maestro[2];
+  resp(m0, [hijo(1, { nacMs: fecha(2015, 11, 25) })]);                                  // reenvío con niño mayor
+  resp(m1, [hijo(1, { doc: m1.ced })]);                                                   // documento igual a la cédula
+  resp({ ...m2, ced: m2.ced.slice(0, -1) + '9' }, [hijo(1)]);                              // cédula mal digitada
+  const comun = hijo(1);
+  resp(maestro[3], [comun]); resp(maestro[4], [{ ...comun }]);                            // pareja
+  if (tipo === 'peor') {
+    const largo = { ...maestro[5], nombre: 'WIŚNIEWSKA-KOWALCZYK HERNÁNDEZ DE LA SANTÍSIMA TRINIDAD MARÍA DE LOS ÁNGELES', sede: sedes[sedes.length - 1], cargo: 'AUXILIAR DE PROTEINAS SENIOR Y RESPONSABLE DE INVENTARIOS DE CUARTOS FRIOS Y NEVERAS' };
+    maestro[5] = largo;
+    resp(largo, [
+      hijo(1, { nombre: 'Jo', doc: '1234567' }),
+      hijo(2, { nombre: 'Maximiliano Alejandro de Jesús Wiśniewska-Kowalczyk Hernández de la Santísima Trinidad', genero: '' }),
+      hijo(3, { nacMs: null, nacRaw: '31/02/2019' }),
+      hijo(4, { nombre: '', doc: '' }),
+      hijo(5, { nacMs: fecha(2026, 12, 31) }),
+      hijo(6),
+    ]);
+  }
+  return { respuestas, maestro, archivos: [`(prueba) ${tipo}`] };
+}
+
+/* =====================================================================
+   10. COMPONENTES DE INTERFAZ
+   ===================================================================== */
+const Icono = {
+  doc: (p) => <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}><path d="M16 6h16l12 12v28a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4Z"/><path d="M32 6v12h12"/><path d="M20 30h16M20 37h16M20 44h9"/></svg>,
+  check: (p) => <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}><path d="m3.5 8.5 3 3 6-7"/></svg>,
+  lock: (p) => <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" {...p}><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>,
+};
+
+// Zona para arrastrar o escoger el Excel
+function ZonaArchivo({ onArchivos, compacta, children }) {
+  const [over, setOver] = useState(false);
+  const input = useRef(null);
+  const recibir = (lista) => { const fs = [...(lista || [])].filter((f) => /\.(xlsx|xlsm|xls)$/i.test(f.name)); if (fs.length) onArchivos(fs); };
+  return (
+    <div
+      className={'drop' + (over ? ' over' : '')}
+      style={compacta ? { minHeight: 130 } : null}
+      role="button" tabIndex={0}
+      onClick={() => input.current.click()}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.current.click(); } }}
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); recibir(e.dataTransfer.files); }}
+    >
+      <Icono.doc className="drop-icon" />
+      {children}
+      <input ref={input} type="file" accept=".xlsx,.xlsm,.xls" multiple hidden onChange={(e) => { recibir(e.target.files); e.target.value = ''; }} />
+    </div>
+  );
+}
+
+// Tabla con búsqueda, orden por columna, paginación y botón de descarga
+function Tabla({ filas, columnas, extra, vacio, onDescargar, filaClave, onFila, seleccion }) {
+  const [q, setQ] = useState('');
+  const [orden, setOrden] = useState({ col: null, dir: 1 });
+  const [limite, setLimite] = useState(CONFIG.filasPorPagina);
+  const cols = columnas.filter((c) => c.ui !== false);
+  useEffect(() => setLimite(CONFIG.filasPorPagina), [q, filas]);
+
+  const filtradas = useMemo(() => {
+    let r = filas;
+    const nq = normTxt(q);
+    if (nq) r = r.filter((f) => normTxt(columnas.map((c) => c.valor(f)).join(' ')).includes(nq));
+    if (orden.col) {
+      const c = columnas.find((x) => x.id === orden.col);
+      const v = c.orden || c.valor;
+      r = [...r].sort((a, b) => { const x = v(a), y = v(b); return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'es', { numeric: true })) * orden.dir; });
+    }
+    return r;
+  }, [filas, q, orden, columnas]);
+
+  const ordenar = (id) => setOrden((o) => (o.col === id ? { col: id, dir: -o.dir } : { col: id, dir: 1 }));
+  if (!filas.length) return <div className="table-wrap"><div className="empty"><b>{vacio[0]}</b>{vacio[1]}</div></div>;
+  return (
+    <div>
+      <div className="table-tools">
+        <input className="search" type="search" placeholder="Buscar por nombre, cédula, documento o sede" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar en la tabla" />
+        <span className="table-meta">{q ? `${fmtNum(filtradas.length)} de ${fmtNum(filas.length)}` : plural(filas.length, 'fila', 'filas')}</span>
+        {onDescargar && <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={onDescargar}>Descargar este listado</button>}
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead><tr>
+            {cols.map((c) => (
+              <th key={c.id} className={c.num ? 'num' : ''} aria-sort={orden.col === c.id ? (orden.dir > 0 ? 'ascending' : 'descending') : 'none'}>
+                <button onClick={() => ordenar(c.id)}>{c.label}<span className="arrow">{orden.col === c.id ? (orden.dir > 0 ? '▲' : '▼') : ''}</span></button>
+              </th>
+            ))}
+            {extra && extra.map((e) => <th key={e.id}>{e.label}</th>)}
+          </tr></thead>
+          <tbody>
+            {filtradas.slice(0, limite).map((f) => {
+              const k = filaClave(f);
+              return (
+                <tr key={k} className={(onFila ? 'clickable ' : '') + (seleccion === k ? 'is-selected' : '')} onClick={onFila ? () => onFila(f) : undefined}>
+                  {cols.map((c) => (
+                    <td key={c.id} className={[c.num && 'num', c.wrap && 'wrap', c.mono && 'mono nowrap'].filter(Boolean).join(' ')}>
+                      {c.render ? c.render(f) : c.valor(f)}
+                    </td>
+                  ))}
+                  {extra && extra.map((e) => <td key={e.id} className={e.className || ''}>{e.render(f)}</td>)}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {!filtradas.length && <div className="empty"><b>Sin resultados</b>Nada coincide con “{q}”.</div>}
+      </div>
+      {filtradas.length > limite && (
+        <div className="more"><button className="btn" onClick={() => setLimite((l) => l + CONFIG.filasPorPagina)}>
+          Mostrar {fmtNum(Math.min(CONFIG.filasPorPagina, filtradas.length - limite))} más (quedan {fmtNum(filtradas.length - limite)})
+        </button></div>
+      )}
+    </div>
+  );
+}
+
+// Columna "Revisión" con los botones Aprobar / No aprobar
+function CeldaDecision({ k, onDecidir }) {
+  if (k.decision) {
+    const ok = k.decision.d === 'OK';
+    return (
+      <div className="decision">
+        <span className={'pill ' + (ok ? 'pill-ok' : 'pill-bad')}>{ok ? 'Aprobado' : 'No aprobado'}</span>
+        {k.reasignadoDe && <small>A nombre de CC {k.ced}</small>}
+        <small>{k.decision.motivo ? `“${k.decision.motivo}” ` : ''}{k.decision.por ? `por ${k.decision.por}` : ''}</small>
+        <button className="btn-link" style={{ alignSelf: 'flex-start' }} onClick={(e) => { e.stopPropagation(); onDecidir(k, null); }}>Cambiar</button>
+      </div>
+    );
+  }
+  return (
+    <div className="decision"><div className="row">
+      <button className="btn btn-sm btn-ok" onClick={(e) => { e.stopPropagation(); onDecidir(k, 'OK'); }}>Aprobar</button>
+      <button className="btn btn-sm btn-bad" onClick={(e) => { e.stopPropagation(); onDecidir(k, 'NO'); }}>No aprobar</button>
+    </div></div>
+  );
+}
+
+// Escalera de edades: 0 a 10 años apilado por género, con los rangos debajo
+function EscaleraEdades({ porEdad, porRango, corte }) {
+  const max = Math.max(1, ...porEdad.map(totalG));
+  return (
+    <figure className="ladder">
+      <div className="ladder-cols" role="img" aria-label={'Niños por edad: ' + porEdad.map((v, e) => `${e} años ${totalG(v)}`).join(', ')}>
+        {porEdad.map((v, e) => {
+          const t = totalG(v);
+          return (
+            <div className="ladder-col" key={e} title={`${e} ${e === 1 ? 'año' : 'años'}: ${t} (F ${v.F}, M ${v.M}${v.O ? `, sin género ${v.O}` : ''})`}>
+              <span className="ladder-total">{fmtNum(t)}</span>
+              <div className="ladder-bar" style={{ height: `${(t / max) * 82}%` }}>
+                <i className="seg-m" style={{ flexGrow: v.M }} />
+                <i className="seg-f" style={{ flexGrow: v.F }} />
+                <i className="seg-o" style={{ flexGrow: v.O }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="ladder-axis" />
+      <div className="ladder-cols" style={{ height: 'auto' }}>
+        {porEdad.map((_, e) => <div className="ladder-col" key={e}><span className="ladder-age">{e}</span></div>)}
+      </div>
+      <div className="ladder-bands">
+        {CONFIG.rangos.map((r) => {
+          const v = porRango[r.id];
+          return (
+            <div className="band" key={r.id} style={{ gridColumn: `${r.min + 1} / ${r.max + 2}` }}>
+              <b>{fmtNum(totalG(v))}</b>
+              <span>{r.label}</span>
+              <small>F {fmtNum(v.F)} · M {fmtNum(v.M)}{v.O ? ` · sin género ${fmtNum(v.O)}` : ''}</small>
+            </div>
+          );
+        })}
+      </div>
+      <figcaption>Edad cumplida al {fmtFechaLarga(corte)}. Solo niños aprobados.</figcaption>
+    </figure>
+  );
+}
+
+/* =====================================================================
+   11. APLICACIÓN PRINCIPAL
+   ===================================================================== */
+const VISTAS = [
+  { id: 'resumen', label: 'Resumen', color: 'var(--tint)' },
+  { id: 'aprobados', label: 'Aprobados', color: 'var(--ok)' },
+  { id: 'revisar', label: 'Por revisar', color: 'var(--warn)' },
+  { id: 'retirados', label: 'No están en el maestro', color: 'var(--warn)' },
+  { id: 'rechazados', label: 'Rechazados', color: 'var(--bad)' },
+  { id: 'sin', label: 'Sin inscribir', color: 'var(--muted)' },
+  { id: 'presupuesto', label: 'Presupuesto y compra', color: 'var(--lime)' },
+  { id: 'descargas', label: 'Descargas', color: 'var(--tint)' },
+];
+
+function leerLocal(k, def) { try { return localStorage.getItem(k) ?? def; } catch (e) { return def; } }
+function guardarLocal(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
+
+function App() {
+  const devMode = useMemo(() => new URLSearchParams(location.search).has('dev'), []);
+  const [datos, setDatos] = useState(null);               // lo que se leyó de los Excel
+  const [fuenteDev, setFuenteDev] = useState('real');     // solo modo pruebas
+  const [fechaEntrega, setFechaEntrega] = useState(CONFIG.fechaEntregaPorDefecto);
+  const [sede, setSede] = useState('');                   // '' = todas las sedes
+  const [vista, setVista] = useState('resumen');
+  const [decisiones, setDecisiones] = useState({});       // revisiones en memoria (NO se guardan en el navegador)
+  const [sinGuardar, setSinGuardar] = useState(0);        // cuántas revisiones no se han descargado
+  const [modal, setModal] = useState(null);
+  const [toast, setToast] = useState('');
+  const [ocupado, setOcupado] = useState('');
+  const [error, setError] = useState('');
+  const [revisor, setRevisor] = useState(() => leerLocal('regalos2026.revisor', '')); // solo el nombre de quien revisa
+  // Presupuesto, catálogo y plan de compra. No tiene datos personales, así que se guarda en el navegador.
+  const [compras, setCompras] = useState(() => {
+    try { const g = JSON.parse(leerLocal('regalos2026.compras', '')); if (g && g.catalogo) return { ...comprasIniciales(), ...g }; } catch (e) { /* nada guardado */ }
+    return comprasIniciales();
+  });
+  const cambiarCompras = (cambio) => setCompras((c) => ({ ...c, ...(typeof cambio === 'function' ? cambio(c) : cambio), fecha: new Date().toISOString() }));
+  useEffect(() => { guardarLocal('regalos2026.compras', JSON.stringify(compras)); }, [compras]);
+  const logo = useRef(null);
+  const inputJson = useRef(null);
+
+  useEffect(() => { cargarLogo().then((l) => { logo.current = l; }); }, []);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3200); return () => clearTimeout(t); } }, [toast]);
+  // Aviso al cerrar la pestaña si hay revisiones sin descargar
+  useEffect(() => {
+    const h = (e) => { if (sinGuardar) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', h);
+    return () => window.removeEventListener('beforeunload', h);
+  }, [sinGuardar]);
+
+  const datosActivos = useMemo(() => (fuenteDev === 'real' ? datos : generarDev(fuenteDev)), [fuenteDev, datos]);
+  const listo = datosActivos && datosActivos.respuestas && datosActivos.maestro;
+  const modelo = useMemo(() => (listo ? procesar(datosActivos, decisiones, fechaEntrega) : null), [listo, datosActivos, decisiones, fechaEntrega]);
+  useEffect(() => { if (modelo && sede && !modelo.sedes.includes(sede)) setSede(''); }, [modelo, sede]);
+
+  // Listas filtradas por la sede escogida
+  const L = useMemo(() => {
+    if (!modelo) return null;
+    const enSede = (x) => !sede || x.sede === sede;
+    const ninos = modelo.ninos.filter(enSede);
+    const por = (est) => ninos.filter((k) => k.estado === est);
+    const aprobados = por('aprobado');
+    const revisar = por('revisar');
+    // Los casos ya decididos siguen visibles en su listado original para poder cambiarlos
+    const revisados = ninos.filter((k) => k.decision);
+    const retirados = ninos.filter((k) => k.estadoBase === 'retirado');
+    const rechazados = ninos.filter((k) => k.estado === 'rechazado' || (k.estadoBase === 'rechazado' && k.decision));
+    const sin = modelo.sinInscribir.filter(enSede);
+    const activos = modelo.maestroActivo.filter(enSede);
+    const respondieron = activos.filter((m) => modelo.colaboradores.has(m.ced)).length;
+    const colabAprob = new Set(aprobados.map((k) => k.ced)).size;
+    const retiradosColab = new Set(retirados.map((k) => k.ced)).size;
+    return {
+      ninos, aprobados, revisar, revisados, retirados, rechazados, sin, activos, respondieron, colabAprob, retiradosColab,
+      revisarTodo: ninos.filter((k) => k.estadoBase === 'revisar'),
+      pendientes: ninos.filter((k) => !k.decision && (k.estadoBase === 'revisar' || k.estadoBase === 'retirado')).length,
+      ...contar(aprobados),
+    };
+  }, [modelo, sede]);
+
+  // ---------- Cargar Excel
+  const cargarExcel = async (files) => {
+    setError(''); setOcupado('Leyendo el Excel…');
+    try {
+      const nuevo = await leerArchivos(files);
+      if (!nuevo.respuestas && !nuevo.maestro) throw new Error('No encontré ni las respuestas del Forms ni el maestro en ese archivo. Revisa que tenga la hoja de respuestas (con “Numero de Documento” y columnas “(Hijo 1)”) y la hoja del maestro (con “Empleado” y “Nombre del empleado”).');
+      setDatos((prev) => {
+        if (nuevo.respuestas && nuevo.maestro) return nuevo;
+        // Si solo trae una parte, se completa con lo que ya estaba cargado
+        return { respuestas: nuevo.respuestas || prev?.respuestas || null, maestro: nuevo.maestro || prev?.maestro || null, archivos: [...(prev?.archivos || []), ...nuevo.archivos] };
+      });
+      setFuenteDev('real');
+      setToast(`Leído: ${files.map((f) => f.name).join(', ')}`);
+    } catch (e) { setError(e.message || String(e)); }
+    setOcupado('');
+  };
+
+  // ---------- Revisiones
+  const pedirDecision = (k, d) => setModal({ tipo: 'decision', k, d });
+  const guardarDecision = (k, d, motivo, por, asignarA = '') => {
+    setRevisor(por); guardarLocal('regalos2026.revisor', por);
+    setDecisiones((prev) => ({ ...prev, [k.key]: { d, motivo: motivo.trim(), por: por.trim(), fecha: new Date().toISOString(), nino: k.nino, ced: k.key.split('|')[0], doc: k.doc, asignarA: d === 'OK' ? asignarA : '' } }));
+    setSinGuardar((n) => n + 1);
+    setModal(null);
+    setToast(d === 'OK' ? `${k.nino || 'Niño'} quedó aprobado` : d === 'NO' ? `${k.nino || 'Niño'} quedó como no aprobado` : 'Revisión quitada');
+  };
+  const totalRevisiones = Object.values(decisiones).filter((d) => d && d.d).length;
+
+  const abrirJson = async (files, clave) => {
+    for (const f of files) {
+      const txt = await f.text();
+      try {
+        const abierto = await abrirJsonRevisiones(txt, clave);
+        setDecisiones((prev) => fusionarDecisiones(prev, abierto.decisiones).decisiones);
+        // El plan de compra del archivo se usa solo si es más reciente que el que ya hay aquí
+        let trajoPlan = false;
+        if (abierto.compras && abierto.compras.catalogo) {
+          setCompras((c) => {
+            if ((abierto.compras.fecha || '') > (c.fecha || '')) { trajoPlan = true; return { ...comprasIniciales(), ...abierto.compras }; }
+            return c;
+          });
+        }
+        setModal(null);
+        setToast(`Cargado ${f.name}${trajoPlan ? ' (incluye el plan de compra)' : ''}`);
+      } catch (e) {
+        if (e.necesitaClave) { setModal({ tipo: 'clave-abrir', files: [f], mala: !!e.claveMala }); return; }
+        setError(e.message);
+      }
+    }
+  };
+  const descargarJson = async (clave) => {
+    setOcupado('Preparando el archivo…');
+    try {
+      const txt = await armarJsonRevisiones(decisiones, clave, revisor, compras);
+      descargarBytes(new TextEncoder().encode(txt), `revisiones_regalos_${CONFIG.anio}_${hoyIso()}.json`, 'application/json');
+      setSinGuardar(0); setModal(null);
+      setToast(clave ? 'Revisiones descargadas con clave' : 'Revisiones descargadas');
+    } catch (e) { setError(e.message); }
+    setOcupado('');
+  };
+
+  // ---------- Presupuesto (siempre con TODAS las sedes: la compra es una sola)
+  const ninosPresupuesto = useMemo(() => (modelo ? modelo.ninos.filter((k) => k.estado === 'aprobado'
+    || (compras.incluirPendientes && !k.decision && (k.estadoBase === 'revisar' || k.estadoBase === 'retirado'))) : []), [modelo, compras.incluirPendientes]);
+  const P = useMemo(() => calcularPresupuesto(ninosPresupuesto, compras), [ninosPresupuesto, compras]);
+
+  // ---------- Descargas
+  const nombreSede = sede || 'Todas las sedes';
+  const hojasDisponibles = L ? [
+    { id: 'aprobados', nombre: 'Aprobados', desc: 'Los niños que reciben regalo', n: L.aprobados.length, ws: () => hojaDesde(L.aprobados, COLS_APROBADOS) },
+    { id: 'revisar', nombre: 'Por revisar', desc: 'Casos raros, incluye los ya revisados', n: L.revisarTodo.length, ws: () => hojaDesde(L.revisarTodo, COLS_REVISAR) },
+    { id: 'retirados', nombre: 'No estan en el maestro', desc: 'Retirados o cédula mal digitada', n: L.retirados.length, ws: () => hojaDesde(L.retirados, COLS_RETIRADOS) },
+    { id: 'rechazados', nombre: 'Rechazados', desc: 'Con el motivo de cada uno', n: L.rechazados.length, ws: () => hojaDesde(L.rechazados, COLS_RECHAZADOS) },
+    { id: 'sin', nombre: 'Sin inscribir', desc: 'Colaboradores activos que no han respondido', n: L.sin.length, ws: () => hojaDesde(L.sin, COLS_SIN) },
+    { id: 'compras', nombre: 'Compras por rango', desc: 'Sede, rango de edad y género', n: null, ws: () => hojaTabla(filasCompras(L.aprobados, modelo.sedes.filter((s) => !sede || s === sede))) },
+    { id: 'edad', nombre: 'Por edad', desc: 'De 0 a 10 años, por género', n: null, ws: () => hojaTabla(filasPorEdad(L.aprobados)) },
+    { id: 'sedes', nombre: 'Resumen por sede', desc: 'Cobertura del maestro y niños por sede', n: null, ws: () => hojaTabla(filasResumenSede(modelo, sede)) },
+    { id: 'revisiones', nombre: 'Revisiones', desc: 'Todas las decisiones de Aprobar / No aprobar', n: L.revisados.length, ws: () => hojaDesde(L.revisados, [C.sede, C.ced, C.colaborador, C.nino, C.doc, { id: 'base', label: 'Estado antes de revisar', valor: (k) => k.estadoBase }, C.motivo, ...COLS_REVISION]) },
+    { id: 'plan', nombre: 'Plan de compra', desc: 'Juguetes y cantidades por rango, contra el presupuesto (todas las sedes)', n: null, ws: () => hojaTabla(filasPlanCompra(P), { 6: '"$"#,##0', 8: '"$"#,##0' }) },
+    { id: 'estimado', nombre: 'Presupuesto estimado', desc: 'Reparto proporcional de la plata por rango y sugerencia', n: null, ws: () => hojaTabla(filasEstimado(P), { 4: '0.0%', 5: '"$"#,##0', 6: '"$"#,##0', 9: '"$"#,##0', 10: '"$"#,##0' }) },
+  ] : [];
+  const descargarHojas = (ids) => {
+    const hojas = hojasDisponibles.filter((h) => ids.includes(h.id)).map((h) => ({ nombre: h.nombre, ws: h.ws() }));
+    if (!hojas.length) return;
+    const nombre = ids.length === 1 ? `Regalos${CONFIG.anio}_${slug(hojas[0].nombre)}_${slug(nombreSede)}_${hoyIso()}.xlsx` : `Regalos${CONFIG.anio}_${slug(nombreSede)}_${hoyIso()}.xlsx`;
+    descargarLibro(hojas, nombre);
+    setToast('Excel descargado');
+  };
+  const descargarPlanilla = async (sedePdf, formato) => {
+    setOcupado('Armando la planilla de firmas…');
+    try {
+      const sedes = sedePdf ? [sedePdf] : modelo.sedes;
+      const aprob = modelo.ninos.filter((k) => k.estado === 'aprobado');
+      const base = `Planilla_firmas_${CONFIG.anio}_${slug(sedePdf || 'todas_las_sedes')}`;
+      if (formato !== 'campos') descargarBytes(await generarPlanilla(aprob, { sedes, corte: modelo.corte, conCampos: false, logo: logo.current }), `${base}_imprimir.pdf`, 'application/pdf');
+      if (formato !== 'imprimir') descargarBytes(await generarPlanilla(aprob, { sedes, corte: modelo.corte, conCampos: true, logo: logo.current }), `${base}_firma_digital.pdf`, 'application/pdf');
+      setToast('Planilla descargada');
+    } catch (e) { setError(e.message || String(e)); }
+    setOcupado('');
+  };
+
+  // ---------- Pantalla inicial (sin datos)
+  if (!listo) {
+    const falta = datosActivos && (!datosActivos.respuestas ? 'las respuestas del Forms' : 'el maestro de personal');
+    return (
+      <>
+        <header className="topbar"><Marca /></header>
+        <main className="hero">
+          <h1>Regalos de Navidad {CONFIG.anio}</h1>
+          <p>Arrastra el Excel del registro para ver cuántos niños hay, revisar los casos raros y sacar las planillas de firma por sede.</p>
+          {falta && <div className="alert alert-warn">Ya leí {datosActivos.archivos.join(', ')}. Falta {falta}: arrastra el archivo que lo tenga.</div>}
+          {error && <div className="alert alert-bad" role="alert">{error}</div>}
+          <ZonaArchivo onArchivos={cargarExcel}>
+            <b>Arrastra aquí el Excel</b>
+            <span>o haz clic para escogerlo. Puedes soltar uno o varios archivos.</span>
+          </ZonaArchivo>
+          <ul className="req">
+            <li><Icono.check />Una hoja con las respuestas del Forms tal como salen (columnas “Numero de Documento” y los bloques “(Hijo 1)” a “(Hijo 6)”).</li>
+            <li><Icono.check />Una hoja con el maestro de personal activo (columnas “Empleado”, “Nombre del empleado”, “Descripcion C.O.”).</li>
+          </ul>
+          <p className="privacy"><Icono.lock />El archivo se lee aquí mismo, en tu navegador. No se sube a ningún servidor y al cerrar la pestaña no queda nada guardado.</p>
+        </main>
+        {ocupado && <Ocupado texto={ocupado} />}
+        {devMode && <DevBar valor={fuenteDev} onCambio={setFuenteDev} />}
+      </>
+    );
+  }
+
+  const cuentas = { aprobados: L.aprobados.length, revisar: L.revisar.length, retirados: L.retirados.length, rechazados: L.rechazados.length, sin: L.sin.length };
+
+  return (
+    <>
+      <header className="topbar">
+        <Marca sub={datosActivos.archivos.join(', ')} />
+        <div className="topbar-tools">
+          <label className="field-inline">Entrega
+            <input type="date" value={fechaEntrega} onChange={(e) => e.target.value && setFechaEntrega(e.target.value)} aria-label="Fecha de entrega (para calcular la edad)" />
+          </label>
+          <label className="field-inline">Sede
+            <select value={sede} onChange={(e) => setSede(e.target.value)}>
+              <option value="">Todas las sedes</option>
+              {modelo.sedes.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <button className="btn btn-ghost btn-sm" onClick={() => setModal({ tipo: 'excel' })}>Cargar otro Excel</button>
+        </div>
+      </header>
+
+      <div className="layout">
+        <aside className="sidebar">
+          <nav className="nav" aria-label="Secciones">
+            {VISTAS.map((v) => (
+              <button key={v.id} aria-current={vista === v.id ? 'page' : undefined} onClick={() => setVista(v.id)}>
+                <span className="dot" style={{ background: v.color }} />
+                <span className="label">{v.label}</span>
+                {cuentas[v.id] != null && <span className="count">{fmtNum(cuentas[v.id])}</span>}
+              </button>
+            ))}
+          </nav>
+          <div className="side-box">
+            <h3>Revisiones</h3>
+            <p>{totalRevisiones ? plural(totalRevisiones, 'caso revisado', 'casos revisados') : 'Aún no hay casos revisados.'} Las revisiones y el plan de compra se guardan en un archivo que se pasan entre ustedes.</p>
+            {sinGuardar > 0 && <span className="pill pill-warn" style={{ alignSelf: 'flex-start' }}>{plural(sinGuardar, 'cambio sin descargar', 'cambios sin descargar')}</span>}
+            <div className="row">
+              <button className="btn btn-sm" onClick={() => inputJson.current.click()}>Abrir archivo</button>
+              <button className="btn btn-sm btn-primary" onClick={() => setModal({ tipo: 'clave-guardar' })} disabled={!Object.keys(decisiones).length && !compras.fecha}>Descargar</button>
+            </div>
+            <input ref={inputJson} type="file" accept=".json,application/json" multiple hidden onChange={(e) => { abrirJson([...e.target.files]); e.target.value = ''; }} />
+          </div>
+        </aside>
+
+        <main className="main" id="contenido">
+          {error && <div className="alert alert-bad" role="alert">{error} <button className="btn-link" onClick={() => setError('')}>Cerrar</button></div>}
+
+          {vista === 'resumen' && <VistaResumen L={L} modelo={modelo} sede={sede} setSede={setSede} setVista={setVista} />}
+
+          {vista === 'aprobados' && (
+            <Seccion titulo="Aprobados" texto={`Niños que reciben regalo en ${nombreSede.toLowerCase() === 'todas las sedes' ? 'todas las sedes' : nombreSede}. La sede es la del maestro.`}>
+              <Tabla filas={L.aprobados} columnas={COLS_APROBADOS} filaClave={(k) => k.key}
+                vacio={['Todavía no hay niños aprobados', 'Cuando lleguen inscripciones válidas aparecen aquí.']}
+                extra={[{ id: 'ok', label: '', render: (k) => k.decision ? <span className="pill pill-ok">Revisado</span> : (k.sedeForms && k.sedeForms !== k.sede ? <span className="pill pill-muted" title={`En el Forms puso: ${k.sedeForms}`}>Otra sede en Forms</span> : null) }]}
+                onDescargar={() => descargarHojas(['aprobados'])} />
+            </Seccion>
+          )}
+
+          {vista === 'revisar' && (
+            <Seccion titulo="Por revisar" texto="Casos raros que necesitan una llamada. Abre el documento, confirma y marca Aprobar o No aprobar. Los ya revisados siguen aquí para poder cambiarlos.">
+              <Tabla filas={L.revisarTodo} columnas={COLS_REVISAR} filaClave={(k) => k.key}
+                vacio={['No hay casos por revisar', 'Todo lo inscrito cumple las reglas.']}
+                extra={[
+                  { id: 'motivos', label: 'Por qué', render: (k) => <ul className="reasons">{k.revisar.map((r, i) => <li key={i}>{r}</li>)}</ul> },
+                  { id: 'foto', label: 'Documento', className: 'nowrap', render: (k) => k.foto ? <a href={k.foto} target="_blank" rel="noopener noreferrer">Ver foto</a> : <span className="sub">Sin foto</span> },
+                  { id: 'dec', label: 'Revisión', render: (k) => <CeldaDecision k={k} onDecidir={pedirDecision} /> },
+                ]}
+                onDescargar={() => descargarHojas(['revisar'])} />
+            </Seccion>
+          )}
+
+          {vista === 'retirados' && (
+            <Seccion titulo="No están en el maestro" texto={`${plural(L.retiradosColab, 'colaborador inscribió', 'colaboradores inscribieron')} niños con una cédula que no está en el maestro activo: se retiró o la cédula quedó mal digitada. Si hay una cédula o nombre parecido en el maestro, se muestra para ayudar a decidir.`}>
+              <Tabla filas={L.retirados} columnas={COLS_RETIRADOS} filaClave={(k) => k.key}
+                vacio={['Todos están en el maestro', 'Ninguna cédula inscrita falta en el maestro activo.']}
+                extra={[
+                  { id: 'sug', label: 'Qué se encontró', render: (k) => (k.sugerencias.length || k.revisar.length)
+                      ? <ul className="reasons">{[...k.sugerencias, ...k.revisar].map((s, i) => <li key={i}>{s}</li>)}</ul>
+                      : <span className="sub">Nada parecido en el maestro</span> },
+                  { id: 'foto', label: 'Documento', className: 'nowrap', render: (k) => k.foto ? <a href={k.foto} target="_blank" rel="noopener noreferrer">Ver foto</a> : <span className="sub">Sin foto</span> },
+                  { id: 'dec', label: 'Revisión', render: (k) => <CeldaDecision k={k} onDecidir={pedirDecision} /> },
+                ]}
+                onDescargar={() => descargarHojas(['retirados'])} />
+            </Seccion>
+          )}
+
+          {vista === 'rechazados' && (
+            <Seccion titulo="Rechazados" texto="No cumplen la edad, ya los inscribió otra persona (pareja) o se marcaron como No aprobado en la revisión.">
+              <Tabla filas={L.rechazados} columnas={COLS_RECHAZADOS} filaClave={(k) => k.key}
+                vacio={['No hay rechazados', 'Ningún niño incumple las reglas.']}
+                extra={[
+                  { id: 'mot', label: 'Motivo', render: (k) => <span style={{ display: 'block', minWidth: 220, fontSize: 12 }}>{motivoEstado(k)}</span> },
+                  { id: 'dec', label: 'Revisión', render: (k) => <CeldaDecision k={k} onDecidir={pedirDecision} /> },
+                ]}
+                onDescargar={() => descargarHojas(['rechazados'])} />
+            </Seccion>
+          )}
+
+          {vista === 'sin' && (
+            <Seccion titulo="Sin inscribir" texto="Colaboradores activos del maestro que no han respondido el Forms (ni siquiera para decir que no tienen hijos). Sirve para los recordatorios por sede.">
+              <Tabla filas={L.sin} columnas={COLS_SIN} filaClave={(m) => m.ced}
+                vacio={['Todos respondieron', 'No queda nadie del maestro sin responder.']}
+                onDescargar={() => descargarHojas(['sin'])} />
+            </Seccion>
+          )}
+
+          {vista === 'presupuesto' && <VistaPresupuesto P={P} compras={compras} cambiarCompras={cambiarCompras}
+            onExcel={() => descargarHojas(['plan', 'estimado'])} setToast={setToast} setError={setError} />}
+
+          {vista === 'descargas' && <VistaDescargas hojas={hojasDisponibles} sedeActual={sede} sedes={modelo.sedes} nombreSede={nombreSede}
+            aprobadosPorSede={(s) => modelo.ninos.filter((k) => k.estado === 'aprobado' && (!s || k.sede === s)).length}
+            onExcel={descargarHojas} onPdf={descargarPlanilla} />}
+        </main>
+      </div>
+
+      {modal?.tipo === 'decision' && <ModalDecision {...modal} revisor={revisor} onCancelar={() => setModal(null)} onGuardar={guardarDecision} />}
+      {modal?.tipo === 'clave-guardar' && <ModalClaveGuardar onCancelar={() => setModal(null)} onGuardar={descargarJson} />}
+      {modal?.tipo === 'clave-abrir' && <ModalClaveAbrir mala={modal.mala} onCancelar={() => setModal(null)} onAbrir={(c) => abrirJson(modal.files, c)} />}
+      {modal?.tipo === 'excel' && (
+        <Modal titulo="Cargar otro Excel" texto="Reemplaza los datos actuales. Las revisiones se conservan." onCerrar={() => setModal(null)}>
+          <ZonaArchivo compacta onArchivos={(f) => { setModal(null); cargarExcel(f); }}><b>Arrastra aquí el Excel</b><span>o haz clic para escogerlo</span></ZonaArchivo>
+          <div className="modal-actions" style={{ marginTop: 14 }}><button className="btn" onClick={() => setModal(null)}>Cancelar</button></div>
+        </Modal>
+      )}
+      {toast && <div className="toast" role="status">{toast}</div>}
+      {ocupado && <Ocupado texto={ocupado} />}
+      {devMode && <DevBar valor={fuenteDev} onCambio={setFuenteDev} />}
+    </>
+  );
+}
+
+function filasResumenSede(modelo, sedeSel) {
+  const out = [['Sede', 'Activos en maestro', 'Respondieron', '% respondió', 'Niños aprobados', 'Femenino', 'Masculino', ...CONFIG.rangos.map((r) => r.label), 'Por revisar', 'No están en maestro', 'Rechazados']];
+  for (const s of modelo.sedes) {
+    if (sedeSel && s !== sedeSel) continue;
+    const act = modelo.maestroActivo.filter((m) => m.sede === s);
+    const resp = act.filter((m) => modelo.colaboradores.has(m.ced)).length;
+    const ns = modelo.ninos.filter((k) => k.sede === s);
+    const ap = ns.filter((k) => k.estado === 'aprobado');
+    const { porRango } = contar(ap);
+    out.push([s, act.length, resp, act.length ? Math.round((resp / act.length) * 100) / 100 : '', ap.length,
+      ap.filter((k) => k.g === 'F').length, ap.filter((k) => k.g === 'M').length, ...CONFIG.rangos.map((r) => totalG(porRango[r.id])),
+      ns.filter((k) => k.estado === 'revisar').length, ns.filter((k) => k.estadoBase === 'retirado' && !k.decision).length, ns.filter((k) => k.estado === 'rechazado').length]);
+  }
+  return out;
+}
+
+/* ---------- Vista Resumen ---------- */
+function VistaResumen({ L, modelo, sede, setSede, setVista }) {
+  const pct = L.activos.length ? L.respondieron / L.activos.length : 0;
+  const filas = useMemo(() => filasResumenSede(modelo, '').slice(1), [modelo]);
+  const totales = filas.reduce((t, f) => f.map((v, i) => (i === 0 || i === 3 ? '' : (t[i] || 0) + v)), []);
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <p style={{ margin: 0 }}>{sede || 'Todas las sedes'}</p>
+          <div className="lead">
+            <span className="big">{fmtNum(L.aprobados.length)}</span>
+            <span className="big-label">{L.aprobados.length === 1 ? 'niño aprobado para recibir regalo' : 'niños aprobados para recibir regalo'}</span>
+          </div>
+        </div>
+      </div>
+      <div className="facts">
+        <div className="fact"><b>{fmtNum(L.colabAprob)}</b><span>{L.colabAprob === 1 ? 'colaborador con niños' : 'colaboradores con niños'}</span></div>
+        <div className="fact"><b>{fmtPct(pct)}</b><span>{fmtNum(L.respondieron)} de {fmtNum(L.activos.length)} activos respondieron</span></div>
+        <div className="fact"><button onClick={() => setVista('revisar')}><b style={{ color: L.revisar.length ? 'var(--warn)' : undefined }}>{fmtNum(L.revisar.length)}</b><span>por revisar</span></button></div>
+        <div className="fact"><button onClick={() => setVista('retirados')}><b>{fmtNum(L.retiradosColab)}</b><span>{L.retiradosColab === 1 ? 'cédula no está en el maestro' : 'cédulas no están en el maestro'}</span></button></div>
+        <div className="fact"><button onClick={() => setVista('rechazados')}><b>{fmtNum(L.rechazados.length)}</b><span>rechazados</span></button></div>
+      </div>
+
+      <section className="section">
+        <div className="section-head">
+          <div><h2>Niños por edad</h2><p>Cada columna es una edad; abajo, los rangos para la compra.</p></div>
+          <div className="legend"><span><i style={{ background: 'var(--fem)' }} />Femenino {fmtNum(L.aprobados.filter((k) => k.g === 'F').length)}</span><span><i style={{ background: 'var(--mas)' }} />Masculino {fmtNum(L.aprobados.filter((k) => k.g === 'M').length)}</span></div>
+        </div>
+        {L.aprobados.length ? <EscaleraEdades porEdad={L.porEdad} porRango={L.porRango} corte={modelo.corte} /> : <div className="empty"><b>Sin niños aprobados</b>{sede ? 'Esta sede todavía no tiene niños aprobados.' : 'Todavía no hay niños aprobados.'}</div>}
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <div><h2>Por sede</h2><p>La sede es la del maestro. Toca una fila para ver solo esa sede.</p></div>
+          {sede && <button className="btn btn-sm" onClick={() => setSede('')}>Ver todas las sedes</button>}
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Sede</th><th className="num">Activos</th><th className="num">Respondieron</th><th className="num">%</th><th className="num">Niños</th>
+              <th className="num">F</th><th className="num">M</th>{CONFIG.rangos.map((r) => <th key={r.id} className="num">{r.label}</th>)}<th className="num">Por revisar</th>
+            </tr></thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f[0]} className={'clickable' + (sede === f[0] ? ' is-selected' : '')} onClick={() => setSede(sede === f[0] ? '' : f[0])}
+                  tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setSede(sede === f[0] ? '' : f[0]); }}>
+                  <td style={{ minWidth: 180 }}>{f[0]}</td><td className="num">{fmtNum(f[1])}</td><td className="num">{fmtNum(f[2])}</td>
+                  <td className="num">{f[3] === '' ? '–' : fmtPct(f[3])}</td><td className="num"><b>{fmtNum(f[4])}</b></td>
+                  <td className="num">{fmtNum(f[5])}</td><td className="num">{fmtNum(f[6])}</td>
+                  {CONFIG.rangos.map((r, i) => <td key={r.id} className="num">{fmtNum(f[7 + i])}</td>)}
+                  <td className="num" style={{ color: f[7 + CONFIG.rangos.length] ? 'var(--warn)' : undefined }}>{fmtNum(f[7 + CONFIG.rangos.length])}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr>
+              <td>Total</td><td className="num">{fmtNum(totales[1])}</td><td className="num">{fmtNum(totales[2])}</td>
+              <td className="num">{totales[1] ? fmtPct(totales[2] / totales[1]) : '–'}</td><td className="num">{fmtNum(totales[4])}</td>
+              <td className="num">{fmtNum(totales[5])}</td><td className="num">{fmtNum(totales[6])}</td>
+              {CONFIG.rangos.map((r, i) => <td key={r.id} className="num">{fmtNum(totales[7 + i])}</td>)}
+              <td className="num">{fmtNum(totales[7 + CONFIG.rangos.length])}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Vista Descargas ---------- */
+function VistaDescargas({ hojas, sedeActual, sedes, nombreSede, aprobadosPorSede, onExcel, onPdf }) {
+  const [marcadas, setMarcadas] = useState(() => hojas.map((h) => h.id));
+  const [sedePdf, setSedePdf] = useState(sedeActual);
+  const [formato, setFormato] = useState('imprimir');
+  const todas = marcadas.length === hojas.length;
+  const nPdf = aprobadosPorSede(sedePdf);
+  return (
+    <>
+      <div className="page-head"><div><h1>Descargas</h1><p>Los listados en Excel salen con el filtro de sede de arriba: <b>{nombreSede}</b>.</p></div></div>
+      <div className="grid-2">
+        <section className="section">
+          <div className="section-head"><div><h2>Listados en Excel</h2><p>Escoge qué hojas quieres. Todo sale en un solo archivo.</p></div>
+            <button className="btn-link" onClick={() => setMarcadas(todas ? [] : hojas.map((h) => h.id))}>{todas ? 'Quitar todas' : 'Marcar todas'}</button></div>
+          <div className="checks">
+            {hojas.map((h) => (
+              <label className="check" key={h.id}>
+                <input type="checkbox" checked={marcadas.includes(h.id)} onChange={(e) => setMarcadas((m) => (e.target.checked ? [...m, h.id] : m.filter((x) => x !== h.id)))} />
+                <span>{h.nombre}<small>{h.desc}</small></span>
+                {h.n != null && <em>{fmtNum(h.n)}</em>}
+              </label>
+            ))}
+          </div>
+          <button className="btn btn-primary" disabled={!marcadas.length} onClick={() => onExcel(marcadas)}>
+            Descargar Excel{marcadas.length ? ` (${plural(marcadas.length, 'hoja', 'hojas')})` : ''}
+          </button>
+        </section>
+
+        <section className="section">
+          <div className="section-head"><div><h2>Planilla de firmas</h2><p>Una fila por niño aprobado. Cada sede empieza en hoja nueva, con el logo y el espacio para que firme el colaborador.</p></div></div>
+          <div className="form-row">
+            <label htmlFor="sedePdf">Sede</label>
+            <select id="sedePdf" value={sedePdf} onChange={(e) => setSedePdf(e.target.value)}>
+              <option value="">Todas las sedes (un solo PDF)</option>
+              {sedes.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="form-row">
+            <span className="lbl" id="lblFormato">Formato</span>
+            <div className="segmented" role="group" aria-labelledby="lblFormato">
+              {[['imprimir', 'Para imprimir'], ['campos', 'Con firma digital'], ['ambos', 'Los dos']].map(([v, t]) => (
+                <button key={v} aria-pressed={formato === v} onClick={() => setFormato(v)}>{t}</button>
+              ))}
+            </div>
+            <p className="hint">{formato === 'imprimir' ? 'Se imprime y se firma a mano.' : 'Cada casilla de firma trae un campo para firmar en Adobe Acrobat o Reader (computador o tablet).'}</p>
+          </div>
+          <button className="btn btn-primary" disabled={!nPdf} onClick={() => onPdf(sedePdf, formato)}>
+            {nPdf ? `Descargar planilla (${plural(nPdf, 'niño', 'niños')})` : 'Esta sede no tiene niños aprobados'}
+          </button>
+        </section>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Vista Presupuesto y compra ----------
+   Arriba: cuánto hay y cuánto se usa. Luego el plan real (lo que ustedes
+   escogen) contra el estimado (reparto proporcional + sugerencia).
+   Al final, el catálogo de juguetes. */
+function VistaPresupuesto({ P, compras, cambiarCompras, onExcel, setToast, setError }) {
+  const inputCat = useRef(null);
+
+  // El plan se guarda por grupo de edad: plan["1-3:1-3"] = [{ codigo, cantidad }]
+  // (con el catálogo actual cada rango es un solo grupo; si un catálogo nuevo trae otras
+  //  edades, un rango se puede partir en varios grupos)
+  const setPlanGrupo = (gid, filas) => cambiarCompras((c) => ({ plan: { ...c.plan, [gid]: filas } }));
+  const copiarSugerencia = () => {
+    if (P.hayPlan && !window.confirm('Esto reemplaza el plan de TODAS las edades por la sugerencia. ¿Seguir?')) return;
+    cambiarCompras({ plan: Object.fromEntries(P.grupos.map((g) => [g.id, g.sugerencia.items.map((x) => ({ ...x }))])) });
+    setToast('La sugerencia quedó como plan de compra');
+  };
+  // Usa la sugerencia en un rango completo (todos sus grupos de edad); los demás rangos no se tocan
+  const copiarSugerenciaRango = (r) => {
+    cambiarCompras((c) => ({ plan: { ...c.plan, ...Object.fromEntries(r.grupos.map((g) => [g.id, g.sugerencia.items.map((x) => ({ ...x }))])) } }));
+    setToast(`Sugerencia aplicada en ${r.label}`);
+  };
+  const cargarCatalogo = async (file) => {
+    try {
+      const cat = await leerCatalogoExcel(file);
+      cambiarCompras({ catalogo: cat });
+      setToast(`Catálogo cargado: ${plural(cat.length, 'juguete', 'juguetes')}`);
+    } catch (e) { setError(e.message); }
+  };
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Presupuesto y compra</h1>
+          <p>Cuántos juguetes comprar con la plata que hay. Cada niño recibe un juguete de SU edad según el catálogo. Cuenta los niños aprobados de todas las sedes, con la edad a la fecha de entrega.</p>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onExcel}>Descargar plan en Excel</button>
+      </div>
+
+      {/* Guía corta: los pasos sí van en orden */}
+      <ol className="guide">
+        <li><b>Define la plata.</b> Escribe el presupuesto y cuánto de él usar para juguetes.</li>
+        <li><b>Mira el estimado.</b> La plata se reparte según cuántos niños hay en cada rango, con una sugerencia de compra.</li>
+        <li><b>Arma el plan.</b> En cada rango escoge juguetes y cantidades. Arriba ves si alcanza la plata y si hay juguete para todos.</li>
+      </ol>
+
+      {/* 1. Presupuesto */}
+      <section className="section">
+        <div className="budget-controls">
+          <div className="form-row">
+            <label htmlFor="ptotal">Presupuesto total</label>
+            <input id="ptotal" type="text" inputMode="numeric" className="money-input"
+              value={fmtNum(compras.total)} onChange={(e) => cambiarCompras({ total: Number(soloDigitos(e.target.value)) || 0 })} />
+          </div>
+          <div className="form-row">
+            <label htmlFor="ppct">Usar para juguetes: <b>{compras.pct}%</b></label>
+            <input id="ppct" type="range" min="0" max="100" step="1" value={compras.pct} onChange={(e) => cambiarCompras({ pct: +e.target.value })} />
+            <p className="hint">{fmtCOP(P.aUsar)} para juguetes. Reserva: {fmtCOP(P.reserva)}.</p>
+          </div>
+          <label className="check" style={{ alignSelf: 'center' }}>
+            <input type="checkbox" checked={compras.incluirPendientes} onChange={(e) => cambiarCompras({ incluirPendientes: e.target.checked })} />
+            <span>Contar también los pendientes<small>Por revisar y los que no están en el maestro, sin decisión todavía</small></span>
+          </label>
+        </div>
+
+        {/* Resumen de GASTO sobre el presupuesto total: gastado / disponible / reserva */}
+        <div className="budget-meter">
+          {(() => {
+            const total = compras.total || 0;
+            const gasto = P.costoPlan;                          // lo que cuesta el plan de compra
+            const sugTotal = P.grupos.reduce((s, g) => s + g.sugerencia.costo, 0);
+            const queda = total - gasto;                        // lo que queda del presupuesto total
+            const disponible = Math.max(0, P.aUsar - gasto);    // de la plata para juguetes, lo que no se ha usado
+            const pctDe = (x) => (total ? x / total : 0);
+            // Anchos de la barra (sobre el presupuesto total, sin pasar del 100 %)
+            const wGasto = Math.min(1, pctDe(gasto));
+            const wDisp = Math.min(1 - wGasto, pctDe(disponible));
+            const wRes = Math.max(0, Math.min(1 - wGasto - wDisp, pctDe(P.reserva)));
+            const pasado = gasto > P.aUsar;                     // el plan se pasa de la plata para juguetes
+            return (
+              <>
+                <p className="gasto-frase">
+                  Del presupuesto de <b>{fmtCOP(total)}</b>{' '}
+                  {P.hayPlan
+                    ? <>se gastan <b className={pasado ? 'neg' : 'tint'}>{fmtCOP(gasto)} ({fmtPct(pctDe(gasto))})</b> y {queda >= 0 ? <>quedan <b>{fmtCOP(queda)} ({fmtPct(pctDe(queda))})</b></> : <>faltan <b className="neg">{fmtCOP(-queda)}</b></>}.
+                        {pasado && queda >= 0 && <> <b className="neg">Ojo: se pasa {fmtCOP(gasto - P.aUsar)} del {compras.pct}% que separaron para juguetes.</b></>}</>
+                    : <>todavía no se gasta nada: falta armar el plan. Con la sugerencia se gastarían <b>{fmtCOP(sugTotal)} ({fmtPct(pctDe(sugTotal))})</b>.</>}
+                </p>
+                <div className="stack" role="img" aria-label={`Gastado ${fmtPct(pctDe(gasto))}, disponible ${fmtPct(pctDe(disponible))}, reserva ${fmtPct(pctDe(P.reserva))}`}>
+                  <i className={'s-gasto' + (pasado ? ' over' : '')} style={{ width: `${wGasto * 100}%` }} />
+                  <i className="s-disp" style={{ width: `${wDisp * 100}%` }} />
+                  <i className="s-res" style={{ width: `${wRes * 100}%` }} />
+                </div>
+                <div className="budget-figures">
+                  <div><b className={pasado ? 'neg' : ''}><i className={'sw s-gasto' + (pasado ? ' over' : '')} />{fmtCOP(gasto)}</b><span>gastado en el plan ({plural(P.unidadesPlan, 'juguete', 'juguetes')}), {fmtPct(pctDe(gasto))}</span></div>
+                  <div><b><i className="sw s-disp" />{fmtCOP(pasado ? 0 : disponible)}</b><span>disponible para juguetes{pasado ? ` (el plan se pasa ${fmtCOP(gasto - P.aUsar)})` : ''}</span></div>
+                  {P.reserva > 0 && <div><b><i className="sw s-res" />{fmtCOP(P.reserva)}</b><span>reserva ({fmtPct(pctDe(P.reserva))})</span></div>}
+                  <div><b>{fmtNum(P.totalNinos)}</b><span>niños, {fmtCOP(P.totalNinos ? P.aUsar / P.totalNinos : 0)} por niño</span></div>
+                </div>
+              </>
+            );
+          })()}
+          <p className="hint">
+            {P.hayPlan && (P.faltanPlan > 0
+              ? <b className="neg">Faltan juguetes para {plural(P.faltanPlan, 'niño', 'niños')}. </b>
+              : <b className="pos">Hay juguete para todos los niños. </b>)}
+            {P.fueraDeEdad.length > 0 && <b className="warn">{plural(P.fueraDeEdad.length, 'juguete no es', 'juguetes no son')} para la edad donde está. </b>}
+            {P.sinEdad ? `${plural(P.sinEdad, 'niño aprobado no tiene', 'niños aprobados no tienen')} una edad entre 0 y 10 años a la fecha de entrega y no se cuenta.` : ''}
+          </p>
+
+          {/* Gasto por rango */}
+          {P.hayPlan && (
+            <div className="table-wrap" style={{ marginTop: 14 }}>
+              <table>
+                <thead><tr><th>Rango</th><th className="num">Niños</th><th className="num">Juguetes</th><th className="num">Gastado</th><th className="num">% del presupuesto</th><th className="num">Por niño</th></tr></thead>
+                <tbody>
+                  {P.rangos.map((r) => (
+                    <tr key={r.id}>
+                      <td className="nowrap">{r.label}</td><td className="num">{fmtNum(r.n)}</td>
+                      <td className={'num' + (r.faltan ? ' neg' : '')}>{fmtNum(r.unidades)}{r.faltan ? ` (faltan ${fmtNum(r.faltan)})` : ''}</td>
+                      <td className="num nowrap">{fmtCOP(r.costo)}</td>
+                      <td className="num">{fmtPct(compras.total ? r.costo / compras.total : 0)}</td>
+                      <td className="num nowrap">{fmtCOP(r.unidades ? r.costo / r.unidades : 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr>
+                  <td>Total</td><td className="num">{fmtNum(P.totalNinos)}</td><td className="num">{fmtNum(P.unidadesPlan)}</td>
+                  <td className="num nowrap">{fmtCOP(P.costoPlan)}</td><td className="num">{fmtPct(compras.total ? P.costoPlan / compras.total : 0)}</td>
+                  <td className="num nowrap">{fmtCOP(P.unidadesPlan ? P.costoPlan / P.unidadesPlan : 0)}</td>
+                </tr></tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 2. Plan real: un bloque por rango, adentro sus grupos de edad */}
+      <section className="section">
+        <div className="section-head">
+          <div><h2>Plan de compra</h2><p>En cada rango solo se ofrecen los juguetes del catálogo para esa edad. Puedes mezclar: por ejemplo pocos del caro y el resto de uno más barato.</p></div>
+          <button className="btn btn-sm" onClick={copiarSugerencia} disabled={!P.totalNinos}>Usar la sugerencia como plan</button>
+        </div>
+        <div className="plan-grid">
+          {P.rangos.map((r) => (
+            <div className="plan-range" key={r.id}>
+              <div className="plan-head">
+                <div><b>{r.label}</b><span>{plural(r.n, 'niño', 'niños')} (F {fmtNum(r.F)}, M {fmtNum(r.M)})</span></div>
+                <div className="plan-money"><span>Plata estimada</span><b>{fmtCOP(r.plata)}</b></div>
+              </div>
+              {r.grupos.map((g) => <GrupoPlan key={g.id} g={g} unico={r.grupos.length === 1} filasGuardadas={compras.plan[g.id] || []} P={P} onCambiar={(filas) => setPlanGrupo(g.id, filas)} />)}
+              {!r.conPlan && r.sugUnidades > 0 && (
+                <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => copiarSugerenciaRango(r)}>Usar la sugerencia en {r.label}</button>
+              )}
+              <div className="plan-foot plan-foot-total">
+                {!r.conPlan
+                  ? <span className="muted">Necesita {plural(r.n, 'juguete', 'juguetes')}</span>
+                  : <span className={r.faltan > 0 ? 'neg' : 'pos'}>{r.faltan > 0 ? `Faltan juguetes para ${plural(r.faltan, 'niño', 'niños')}` : 'Todos los niños del rango tienen juguete'}</span>}
+                <span>Total {fmtCOP(r.costo)}{r.conPlan && r.plata !== r.costo
+                  ? <small className={r.plata - r.costo < 0 ? 'neg' : ''}>{r.plata - r.costo < 0 ? ` se pasa ${fmtCOP(r.costo - r.plata)} del estimado` : ` quedan ${fmtCOP(r.plata - r.costo)} del estimado`}</small>
+                  : null}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3. Estimado, por grupo de edad */}
+      <section className="section">
+        <div className="section-head"><div><h2>Estimado</h2><p>La plata se reparte según cuántos niños hay de cada edad (el mismo valor por niño). Con esa plata se sugiere qué comprar, repartiendo los niños por igual entre los juguetes de su edad; si no alcanza, se quitan los más caros.</p></div></div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Rango</th><th>Edades</th><th>Juguetes de</th><th className="num">Niños</th><th className="num">Plata</th><th>Sugerencia</th><th className="num">Costo</th><th className="num">Sobra</th></tr></thead>
+            <tbody>
+              {P.grupos.map((g, i) => (
+                <tr key={g.id}>
+                  <td className="nowrap">{i === 0 || P.grupos[i - 1].rango.id !== g.rango.id ? <b>{g.rango.label}</b> : ''}</td>
+                  <td className="nowrap">{g.label}</td>
+                  <td className="nowrap">{g.edadesCatalogo ? `${g.edadesCatalogo} años` : '–'}</td>
+                  <td className="num">{fmtNum(g.n)}</td>
+                  <td className="num nowrap">{fmtCOP(g.plata)}</td>
+                  <td style={{ minWidth: 220 }}>
+                    {g.sirven.length === 0 ? <span className="sub neg">El catálogo no tiene juguetes para esta edad</span>
+                      : g.n === 0 ? <span className="sub">Sin niños</span>
+                      : <ul className="reasons">{g.sugerencia.items.map((x) => <li key={x.codigo}>{fmtNum(x.cantidad)} × {P.porCodigo.get(x.codigo)?.nombre}</li>)}
+                          {g.sugerencia.unidades < g.n && <li className="neg">No alcanza: faltan {fmtNum(g.n - g.sugerencia.unidades)}</li>}</ul>}
+                  </td>
+                  <td className="num nowrap">{fmtCOP(g.sugerencia.costo)}</td>
+                  <td className="num nowrap">{fmtCOP(g.plata - g.sugerencia.costo)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr>
+              <td colSpan={3}>Total</td><td className="num">{fmtNum(P.totalNinos)}</td><td className="num nowrap">{fmtCOP(P.aUsar)}</td><td />
+              <td className="num nowrap">{fmtCOP(P.grupos.reduce((s, g) => s + g.sugerencia.costo, 0))}</td>
+              <td className="num nowrap">{fmtCOP(P.grupos.reduce((s, g) => s + g.plata - g.sugerencia.costo, 0))}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </section>
+
+      {/* 4. Catálogo */}
+      <section className="section">
+        <div className="section-head">
+          <div><h2>Catálogo de juguetes</h2><p>La edad del catálogo decide a qué niños se les puede dar cada juguete. El precio se puede corregir aquí mismo.</p></div>
+          <div className="row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-sm" onClick={() => inputCat.current.click()}>Cargar catálogo desde Excel</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => { if (window.confirm('¿Volver al catálogo original? Los precios que cambiaste se pierden.')) cambiarCompras({ catalogo: CATALOGO_BASE }); }}>Catálogo original</button>
+            <input ref={inputCat} type="file" accept=".xlsx,.xlsm,.xls" hidden onChange={(e) => { if (e.target.files[0]) cargarCatalogo(e.target.files[0]); e.target.value = ''; }} />
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Código</th><th>Juguete</th><th>Edad catálogo</th><th>Se le da a</th><th className="num">Precio</th></tr></thead>
+            <tbody>
+              {compras.catalogo.map((t) => (
+                <tr key={t.codigo}>
+                  <td className="mono">{t.codigo}</td><td className="wrap">{t.nombre}</td><td className="nowrap">{t.edadTxt} {t.edadTxt === '1' ? 'año' : 'años'}</td>
+                  <td>{usosDeJuguete(t, P.grupos).map((g) => `${g.label} (rango ${g.rango.label})`).join(', ') || '–'}</td>
+                  <td className="num">
+                    <input className="price-input" type="text" inputMode="numeric" aria-label={`Precio de ${t.nombre}`} value={fmtNum(t.precio)}
+                      onChange={(e) => cambiarCompras((c) => ({ catalogo: c.catalogo.map((x) => (x.codigo === t.codigo ? { ...x, precio: Number(soloDigitos(e.target.value)) || 0 } : x)) }))} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
+
+// Un grupo de edad dentro de un rango: sus juguetes, cantidades y si alcanza para todos
+// unico = el rango tiene un solo grupo de edad (no se repite el encabezado de edad y plata)
+function GrupoPlan({ g, filasGuardadas, P, onCambiar, unico }) {
+  const falta = g.n - g.unidades;
+  const opciones = [...g.sirven].sort((a, b) => a.precio - b.precio); // solo juguetes de esta edad
+  const cambiarFila = (idx, cambio) => onCambiar(filasGuardadas.map((x, i) => (i === idx ? { ...x, ...cambio } : x)));
+  const usados = new Set(filasGuardadas.map((x) => x.codigo));
+  const siguiente = opciones.find((t) => !usados.has(t.codigo));
+  return (
+    <div className="plan-group">
+      {unico
+        ? <div className="plan-group-head"><span>{g.edadesCatalogo ? `Juguetes del catálogo para ${g.edadesCatalogo} ${g.edadesCatalogo === '1' ? 'año' : 'años'}` : 'Sin juguetes en el catálogo'}</span></div>
+        : <div className="plan-group-head">
+            <b>{g.label}</b>
+            <span>{plural(g.n, 'niño', 'niños')}{g.edadesCatalogo ? `, juguetes de ${g.edadesCatalogo} años` : ''}</span>
+            <span className="plan-group-money">{fmtCOP(g.plata)}</span>
+          </div>}
+      {g.sirven.length === 0 && g.n > 0 && <p className="hint neg">El catálogo no tiene juguetes para esta edad: agrega uno en el Excel del catálogo.</p>}
+      {g.filasPlan.length === 0 && g.n > 0 && g.sugerencia.items.length > 0 && (
+        <p className="hint">Sugerencia: {g.sugerencia.items.map((x) => `${fmtNum(x.cantidad)} × ${P.porCodigo.get(x.codigo)?.nombre}`).join(', ')}{g.sugerencia.unidades < g.n ? ` (alcanza para ${fmtNum(g.sugerencia.unidades)} de ${fmtNum(g.n)})` : ''}.</p>
+      )}
+      {g.filasPlan.map((f) => {
+        // Cuántas unidades de este juguete caben con la plata estimada del grupo (descontando los otros juguetes)
+        const libre = g.plata - (g.costo - f.subtotal);
+        const caben = f.precio ? Math.max(0, Math.floor(libre / f.precio)) : 0;
+        const enOtras = new Set(g.filasPlan.filter((x) => x.i !== f.i).map((x) => x.codigo)); // no repetir juguete
+        return (
+          <div className="plan-row" key={f.i}>
+            <select aria-label="Juguete" value={f.codigo} onChange={(e) => cambiarFila(f.i, { codigo: e.target.value })} className={f.sirve ? '' : 'mal'}>
+              {!f.sirve && <option value={f.codigo}>{f.juguete ? `${f.juguete.nombre} (no es para esta edad)` : '(no está en el catálogo)'}</option>}
+              {opciones.map((t) => <option key={t.codigo} value={t.codigo} disabled={enOtras.has(t.codigo)}>{t.nombre}, {fmtCOP(t.precio)}</option>)}
+            </select>
+            <input aria-label="Cantidad" type="number" min="0" step="1" value={f.cantidad || ''} placeholder="0"
+              onChange={(e) => cambiarFila(f.i, { cantidad: Math.max(0, Math.floor(+e.target.value || 0)) })} />
+            <span className="plan-sub" title={`Con la plata estimada de esta edad (descontando los otros juguetes) alcanzan ${fmtNum(caben)} unidades de este`}>{fmtCOP(f.subtotal)}<small>caben {fmtNum(caben)}</small></span>
+            <button className="btn-x" aria-label="Quitar juguete" onClick={() => onCambiar(filasGuardadas.filter((_, i) => i !== f.i))}>×</button>
+          </div>
+        );
+      })}
+      <div className="plan-foot">
+        {siguiente && g.n > 0
+          ? <button className="btn-link" onClick={() => onCambiar([...filasGuardadas, { codigo: siguiente.codigo, cantidad: Math.max(0, g.n - g.unidades) }])}>+ Agregar juguete</button>
+          : <span />}
+        {g.filasPlan.length > 0 && (
+          <span className={falta > 0 ? 'neg' : falta < 0 ? 'warn' : 'pos'}>
+            {fmtNum(g.unidades)} para {fmtNum(g.n)}{falta > 0 ? `: faltan ${fmtNum(falta)}` : falta < 0 ? `: sobran ${fmtNum(-falta)}` : ': completo'}, {fmtCOP(g.costo)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Piezas pequeñas ---------- */
+function Marca({ sub }) {
+  const [ok, setOk] = useState(true);
+  return (
+    <div className="brand">
+      {ok && <img src={CONFIG.logoUrl} alt="Supertiendas Cañaveral" onError={() => setOk(false)} />}
+      <div className="brand-text"><b>Regalos de Navidad {CONFIG.anio}</b><span title={sub}>{sub || 'Gestión Humana'}</span></div>
+    </div>
+  );
+}
+function Seccion({ titulo, texto, children }) {
+  return (<><div className="page-head"><div><h1>{titulo}</h1><p>{texto}</p></div></div>{children}</>);
+}
+function Ocupado({ texto }) { return <div className="busy" role="status"><div><div className="spinner" />{texto}</div></div>; }
+function Modal({ titulo, texto, onCerrar, children }) {
+  useEffect(() => { const h = (e) => e.key === 'Escape' && onCerrar(); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onCerrar]);
+  return (
+    <div className="backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={titulo}>
+        <h2>{titulo}</h2>{texto && <p>{texto}</p>}{children}
+      </div>
+    </div>
+  );
+}
+function ModalDecision({ k, d, revisor, onCancelar, onGuardar }) {
+  const [dec, setDec] = useState(d || k.decision?.d || 'OK');
+  const [motivo, setMotivo] = useState(k.decision?.motivo || '');
+  const [por, setPor] = useState(revisor || '');
+  const [asignarA, setAsignarA] = useState(k.decision?.asignarA || '');
+  const cedOriginal = k.key.split('|')[0];
+  const puede = por.trim() && (dec === 'OK' || motivo.trim());
+  return (
+    <Modal titulo={k.nino || 'Niño sin nombre'} texto={`Inscrito con la cédula ${cedOriginal}${k.reasignadoDe ? ` (${k.reasignadoDe})` : ` por ${k.colaborador}`}. Documento del niño: ${k.doc || 'sin documento'}.`} onCerrar={onCancelar}>
+      <div className="form-row">
+        <span className="lbl">Decisión</span>
+        <div className="segmented" role="group">
+          <button aria-pressed={dec === 'OK'} onClick={() => setDec('OK')}>Aprobar</button>
+          <button aria-pressed={dec === 'NO'} onClick={() => setDec('NO')}>No aprobar</button>
+        </div>
+      </div>
+      {dec === 'OK' && k.candidatos?.length > 0 && (
+        <div className="form-row">
+          <label htmlFor="asignar">Entregar a nombre de</label>
+          <select id="asignar" value={asignarA} onChange={(e) => setAsignarA(e.target.value)}>
+            <option value="">Dejarlo como está (CC {cedOriginal})</option>
+            {k.candidatos.map((c) => <option key={c.ced} value={c.ced}>CC {c.ced}, {c.nombre} ({c.sede})</option>)}
+          </select>
+          <p className="hint">Si en el Forms pusieron mal la cédula, escoge a la persona correcta del maestro: el niño sale en su sede y en su planilla.</p>
+        </div>
+      )}
+      <div className="form-row">
+        <label htmlFor="motivo">Motivo{dec === 'NO' ? '' : ' (opcional)'}</label>
+        <input id="motivo" type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} placeholder={dec === 'OK' ? 'Ej: se llamó al líder y confirmó el documento' : 'Ej: el documento no corresponde a un hijo'} autoFocus />
+      </div>
+      <div className="form-row">
+        <label htmlFor="por">Tu nombre</label>
+        <input id="por" type="text" value={por} onChange={(e) => setPor(e.target.value)} maxLength={60} placeholder="Quién revisa" />
+      </div>
+      <div className="modal-actions">
+        {k.decision && <button className="btn btn-ghost" onClick={() => onGuardar(k, null, '', por || revisor || '')}>Quitar revisión</button>}
+        <span className="spacer" />
+        <button className="btn" onClick={onCancelar}>Cancelar</button>
+        <button className="btn btn-primary" disabled={!puede} onClick={() => onGuardar(k, dec, motivo, por, asignarA)}>Guardar revisión</button>
+      </div>
+    </Modal>
+  );
+}
+function ModalClaveGuardar({ onCancelar, onGuardar }) {
+  const [c1, setC1] = useState(''); const [c2, setC2] = useState(''); const [sin, setSin] = useState(false);
+  const corta = !sin && c1.length > 0 && c1.length < 10;
+  const distinta = !sin && c2.length > 0 && c1 !== c2;
+  const puede = sin || (c1.length >= 10 && c1 === c2);
+  return (
+    <Modal titulo="Descargar revisiones" texto="El archivo trae documentos y nombres de niños. Ponle una clave que solo conozcan ustedes; sin ella no se puede abrir." onCerrar={onCancelar}>
+      {!sin && <>
+        <div className="form-row"><label htmlFor="c1">Clave (mínimo 10 caracteres)</label><input id="c1" type="password" value={c1} onChange={(e) => setC1(e.target.value)} autoFocus autoComplete="new-password" />{corta && <p className="hint" style={{ color: 'var(--bad)' }}>Muy corta.</p>}</div>
+        <div className="form-row"><label htmlFor="c2">Repite la clave</label><input id="c2" type="password" value={c2} onChange={(e) => setC2(e.target.value)} autoComplete="new-password" />{distinta && <p className="hint" style={{ color: 'var(--bad)' }}>No coincide.</p>}</div>
+      </>}
+      <label className="check" style={{ padding: '4px 0 12px' }}><input type="checkbox" checked={sin} onChange={(e) => setSin(e.target.checked)} /><span>Descargar sin clave<small>Cualquiera que tenga el archivo podrá leerlo.</small></span></label>
+      <div className="modal-actions"><button className="btn" onClick={onCancelar}>Cancelar</button><button className="btn btn-primary" disabled={!puede} onClick={() => onGuardar(sin ? '' : c1)}>Descargar</button></div>
+    </Modal>
+  );
+}
+function ModalClaveAbrir({ mala, onCancelar, onAbrir }) {
+  const [c, setC] = useState('');
+  return (
+    <Modal titulo="Este archivo tiene clave" texto="Escribe la clave que acordaron para las revisiones." onCerrar={onCancelar}>
+      <div className="form-row"><label htmlFor="ca">Clave</label><input id="ca" type="password" value={c} onChange={(e) => setC(e.target.value)} autoFocus onKeyDown={(e) => e.key === 'Enter' && c && onAbrir(c)} />{mala && <p className="hint" style={{ color: 'var(--bad)' }}>La clave no es correcta. Intenta de nuevo.</p>}</div>
+      <div className="modal-actions"><button className="btn" onClick={onCancelar}>Cancelar</button><button className="btn btn-primary" disabled={!c} onClick={() => onAbrir(c)}>Abrir</button></div>
+    </Modal>
+  );
+}
+function DevBar({ valor, onCambio }) {
+  return (
+    <div className="devbar" role="group" aria-label="Datos de prueba">
+      {[['real', 'Datos reales'], ['demo', 'Demo'], ['peor', 'Peor caso'], ['uno', 'Uno'], ['vacio', 'Vacío']].map(([v, t]) => (
+        <button key={v} aria-pressed={valor === v} onClick={() => onCambio(v)}>{t}</button>
+      ))}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
