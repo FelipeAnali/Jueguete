@@ -3025,7 +3025,7 @@ function ModalMaestroOk({ r, onCerrar, onVer }) {
         <li>{plural(r.actualizadas, 'persona con datos actualizados', 'personas con datos actualizados')}</li>
         {r.modo === 'reemplazar' && <li>{plural(r.quitadas, 'persona ya no está', 'personas ya no están')} en el maestro</li>}
         {resueltos != null && resueltos > 0 && <li><b>{plural(resueltos, 'niño que no estaba en el maestro ahora sí está', 'niños que no estaban en el maestro ahora sí están')}</b></li>}
-        {r.fueraDespues != null && <li>{r.fueraDespues ? `Quedan ${plural(r.fueraDespues, 'niño', 'niños')} con cédula que no está en el maestro` : 'Ya no queda ningún niño fuera del maestro'}</li>}
+        {r.fueraDespues != null && <li>{r.fueraDespues ? `${r.fueraDespues === 1 ? 'Queda' : 'Quedan'} ${plural(r.fueraDespues, 'niño', 'niños')} con cédula que no está en el maestro` : 'Ya no queda ningún niño fuera del maestro'}</li>}
       </ul>
       <div className="modal-actions">
         {r.fueraDespues ? <button className="btn" onClick={onVer}>Ver los que no están</button> : null}
