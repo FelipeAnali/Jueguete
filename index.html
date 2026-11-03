@@ -631,7 +631,7 @@ async function leerArchivos(files) {
           leerRespuestas(enc, filas.slice(f + 1)).forEach((r) => respuestas.set(r.id + '|' + r.ced, r));
           break;
         }
-        if (enc.includes('empleado') && enc.includes('nombre del empleado')) {
+        if (columnasMaestro(enc)) {
           hayMaestro = true;
           leerMaestro(enc, filas.slice(f + 1)).forEach((m) => maestro.set(m.ced, m));
           break;
@@ -717,13 +717,24 @@ function extraerLink(v) {
   return m ? m[0] : '';
 }
 
+// Columnas del maestro. Acepta el formato de siempre ("Empleado", "Nombre del empleado",
+// "Descripcion C.O.") y nombres parecidos por si el maestro nuevo viene de otro reporte.
+const ALIAS_MAESTRO = {
+  ced: ['empleado', 'cedula', 'cedula empleado', 'numero de cedula', 'no. cedula', 'documento', 'identificacion', 'numero de identificacion', 'nit'],
+  nombre: ['nombre del empleado', 'nombre empleado', 'nombre completo', 'nombres y apellidos', 'nombre'],
+  sede: ['descripcion c.o.', 'descripcion c.o', 'descripcion co', 'centro de operacion', 'sede', 'c.o.'],
+  cargo: ['descripcion del cargo', 'cargo'],
+  celular: ['celular del contacto', 'celular', 'telefono'],
+  email: ['email del contacto', 'email', 'correo', 'correo electronico'],
+  retiro: ['fecha retiro', 'fecha de retiro'],
+};
+function columnasMaestro(enc) {
+  const c = {};
+  for (const [k, nombres] of Object.entries(ALIAS_MAESTRO)) c[k] = nombres.map((n) => enc.indexOf(n)).find((i) => i >= 0) ?? -1;
+  return c.ced >= 0 && c.nombre >= 0 ? c : null;
+}
 function leerMaestro(enc, filas) {
-  const col = (nombre) => enc.indexOf(nombre);
-  const c = {
-    ced: col('empleado'), nombre: col('nombre del empleado'), sede: col('descripcion c.o.'),
-    cargo: col('descripcion del cargo'), celular: col('celular del contacto'), email: col('email del contacto'),
-    retiro: col('fecha retiro'),
-  };
+  const c = columnasMaestro(enc);
   const out = [];
   filas.forEach((f) => {
     const ced = soloDigitos(f[c.ced]);
@@ -2143,6 +2154,31 @@ function App() {
     setOcupado('');
   };
 
+  // ---------- Actualizar solo el maestro de personal
+  // modo 'agregar': suma las personas nuevas y actualiza las que ya estaban (por cédula); nadie se borra.
+  // modo 'reemplazar': el maestro nuevo reemplaza al anterior completo.
+  const cargarMaestro = async (files, modo) => {
+    setError(''); setOcupado('Leyendo el maestro…');
+    try {
+      const nuevo = await leerArchivos(files);
+      if (!nuevo.maestro || !nuevo.maestro.length) throw new Error('No encontré el maestro de personal en ese archivo. Debe tener una columna con la cédula ("Empleado" o "Cédula") y otra con el nombre ("Nombre del empleado" o "Nombre").');
+      const antes = datos?.maestro || [];
+      const porCed = new Map(antes.map((m) => [m.ced, m]));
+      let nuevas = 0, actualizadas = 0;
+      for (const m of nuevo.maestro) { if (!porCed.has(m.ced)) nuevas++; else if (JSON.stringify(porCed.get(m.ced)) !== JSON.stringify(m)) actualizadas++; }
+      let maestro;
+      if (modo === 'reemplazar') maestro = nuevo.maestro;
+      else { nuevo.maestro.forEach((m) => porCed.set(m.ced, m)); maestro = [...porCed.values()]; }
+      const nuevosDatos = { respuestas: datos?.respuestas || null, maestro, archivos: [...(datos?.archivos || []).filter((a) => !nuevo.archivos.includes(a)), ...nuevo.archivos], fecha: new Date().toISOString() };
+      // Cuántos niños que "no estaban en el maestro" ahora sí están
+      const fuera = (d) => (d.respuestas && d.maestro ? procesar(d, decisiones, fechaEntrega).ninos.filter((k) => k.estadoBase === 'retirado').length : null);
+      const fueraAntes = datos ? fuera(datos) : null, fueraDespues = fuera(nuevosDatos);
+      setDatos(nuevosDatos); setFuenteDev('real');
+      setModal({ tipo: 'maestro-ok', resumen: { modo, total: maestro.length, activos: maestro.filter((m) => m.retiro == null).length, nuevas, actualizadas, quitadas: modo === 'reemplazar' ? antes.filter((m) => !nuevo.maestro.some((x) => x.ced === m.ced)).length : 0, fueraAntes, fueraDespues } });
+    } catch (e) { setError(e.message || String(e)); setModal(null); }
+    setOcupado('');
+  };
+
   // ---------- Revisiones
   const pedirDecision = (k, d) => setModal({ tipo: 'decision', k, d });
   const guardarDecision = (k, d, motivo, por, asignarA = '') => {
@@ -2287,6 +2323,7 @@ function App() {
               {modelo.sedes.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
+          <button className="btn btn-ghost btn-sm" onClick={() => setModal({ tipo: 'maestro' })}>Actualizar maestro</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setModal({ tipo: 'excel' })}>Cargar otro Excel</button>
         </div>
       </header>
@@ -2344,6 +2381,10 @@ function App() {
 
           {vista === 'retirados' && (
             <Seccion titulo="No están en el maestro" texto={`${plural(L.retiradosColab, 'colaborador inscribió', 'colaboradores inscribieron')} niños con una cédula que no está en el maestro activo: se retiró o la cédula quedó mal digitada. Si hay una cédula o nombre parecido en el maestro, se muestra para ayudar a decidir.`}>
+              <div className="alert" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 14 }}>
+                <span>¿Entró personal nuevo o corrigieron cédulas? Actualiza el maestro y esta lista se recalcula sola.</span>
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ tipo: 'maestro' })}>Actualizar maestro</button>
+              </div>
               <Tabla filas={L.retirados} columnas={COLS_RETIRADOS} filaClave={(k) => k.key}
                 vacio={['Todos están en el maestro', 'Ninguna cédula inscrita falta en el maestro activo.']}
                 extra={[
@@ -2390,6 +2431,8 @@ function App() {
       {modal?.tipo === 'github' && <ModalGithub gh={gh} clave={claveNube} onCancelar={() => setModal(null)} onGuardar={guardarConfigGh} onDesconectar={desconectarGh} onBorrar={borrarEsteEquipo} />}
       {modal?.tipo === 'clave-guardar' && <ModalClaveGuardar onCancelar={() => setModal(null)} onGuardar={descargarJson} />}
       {modal?.tipo === 'clave-abrir' && <ModalClaveAbrir mala={modal.mala} onCancelar={() => setModal(null)} onAbrir={(c) => abrirJson(modal.files, c)} />}
+      {modal?.tipo === 'maestro' && <ModalMaestro onCerrar={() => setModal(null)} onArchivos={cargarMaestro} total={datos?.maestro?.length || 0} />}
+      {modal?.tipo === 'maestro-ok' && <ModalMaestroOk r={modal.resumen} onCerrar={() => setModal(null)} onVer={() => { setModal(null); setVista('retirados'); }} />}
       {modal?.tipo === 'excel' && (
         <Modal titulo="Cargar otro Excel" texto="Reemplaza los datos actuales (también en la copia de GitHub). Las revisiones se conservan." onCerrar={() => setModal(null)}>
           <ZonaArchivo compacta onArchivos={(f) => { setModal(null); cargarExcel(f); }}><b>Arrastra aquí el Excel</b><span>o haz clic para escogerlo</span></ZonaArchivo>
@@ -2958,6 +3001,37 @@ function EstadoGuardado({ local, nube, gh, onGithub, onSubir }) {
         {(n === 'error' || n === 'pendiente') && <button className="btn btn-sm btn-primary" onClick={onSubir}>Subir ahora</button>}
       </div>
     </div>
+  );
+}
+function ModalMaestro({ onCerrar, onArchivos, total }) {
+  const [modo, setModo] = useState('agregar');
+  return (
+    <Modal titulo="Actualizar maestro de personal" texto={`Sube el Excel del maestro nuevo. Las respuestas del Forms y las revisiones no se tocan.${total ? ` Hoy hay ${fmtNum(total)} personas en el maestro.` : ''}`} onCerrar={onCerrar}>
+      <div className="checks" role="radiogroup" aria-label="Cómo actualizar">
+        <label className="check"><input type="radio" name="modo-maestro" checked={modo === 'agregar'} onChange={() => setModo('agregar')} /><span>Agregar y actualizar personas<small>Suma las personas nuevas y actualiza los datos de las que ya estaban. No se borra a nadie. Sirve si el archivo trae solo los ingresos nuevos.</small></span></label>
+        <label className="check"><input type="radio" name="modo-maestro" checked={modo === 'reemplazar'} onChange={() => setModo('reemplazar')} /><span>Reemplazar el maestro completo<small>Usa este archivo como el maestro nuevo. Quien no esté en él queda como “no está en el maestro”.</small></span></label>
+      </div>
+      <ZonaArchivo compacta onArchivos={(f) => onArchivos(f, modo)}><b>Arrastra aquí el maestro</b><span>o haz clic para escogerlo</span></ZonaArchivo>
+      <div className="modal-actions" style={{ marginTop: 14 }}><button className="btn" onClick={onCerrar}>Cancelar</button></div>
+    </Modal>
+  );
+}
+function ModalMaestroOk({ r, onCerrar, onVer }) {
+  const resueltos = r.fueraAntes != null && r.fueraDespues != null ? r.fueraAntes - r.fueraDespues : null;
+  return (
+    <Modal titulo="Maestro actualizado" texto={`Ahora hay ${plural(r.total, 'persona', 'personas')} en el maestro (${fmtNum(r.activos)} activas).`} onCerrar={onCerrar}>
+      <ul className="reasons" style={{ margin: '0 0 14px' }}>
+        <li>{plural(r.nuevas, 'persona nueva', 'personas nuevas')}</li>
+        <li>{plural(r.actualizadas, 'persona con datos actualizados', 'personas con datos actualizados')}</li>
+        {r.modo === 'reemplazar' && <li>{plural(r.quitadas, 'persona ya no está', 'personas ya no están')} en el maestro</li>}
+        {resueltos != null && resueltos > 0 && <li><b>{plural(resueltos, 'niño que no estaba en el maestro ahora sí está', 'niños que no estaban en el maestro ahora sí están')}</b></li>}
+        {r.fueraDespues != null && <li>{r.fueraDespues ? `Quedan ${plural(r.fueraDespues, 'niño', 'niños')} con cédula que no está en el maestro` : 'Ya no queda ningún niño fuera del maestro'}</li>}
+      </ul>
+      <div className="modal-actions">
+        {r.fueraDespues ? <button className="btn" onClick={onVer}>Ver los que no están</button> : null}
+        <button className="btn btn-primary" onClick={onCerrar}>Listo</button>
+      </div>
+    </Modal>
   );
 }
 function AbrirConClave({ onAbrir }) {
