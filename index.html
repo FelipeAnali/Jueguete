@@ -195,6 +195,21 @@ a{color:var(--tint)}
 .side-box h3{margin:0;font:600 13px/1.3 var(--font-display)}
 .side-box p{margin:0;color:var(--muted);font-size:12px}
 .side-box .row{display:flex;gap:6px;flex-wrap:wrap}
+.modal.modal-ancho{width:min(1040px,100%)}
+.tabla-agregar{width:100%;border-collapse:collapse;font-size:13px}
+.tabla-agregar th{text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:4px 4px 6px}
+.tabla-agregar td{padding:3px 4px;vertical-align:top}
+.tabla-agregar input,.tabla-agregar select{width:100%;min-width:0;font:inherit;padding:7px 8px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--ink)}
+.tabla-agregar .ayuda{display:block;font-size:11px;margin-top:3px;color:var(--muted)}
+.tabla-agregar .ayuda.ok{color:var(--ok)}
+.tabla-agregar .ayuda.mal{color:var(--warn)}
+.tabla-agregar-wrap{overflow-x:auto;margin:0 0 12px}
+.pegar{width:100%;min-height:90px;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px;border:1px dashed var(--line-strong);border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink)}
+.matriz td.num,.matriz th.num{text-align:right}
+.matriz tfoot td{font-weight:700;border-top:2px solid var(--line-strong)}
+.matriz th .sub{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
+.matriz th{vertical-align:bottom;white-space:normal;min-width:96px}
+
 .bulkbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin:0 0 10px;border-radius:var(--r-md);background:var(--surface-2);font-size:13px;color:var(--muted)}
 .bulkbar.activa{background:var(--tint-soft);color:var(--ink);position:sticky;top:64px;z-index:5;box-shadow:var(--shadow)}
 th.sel,td.sel{width:34px;text-align:center;padding-left:10px;padding-right:4px}
@@ -776,7 +791,7 @@ function leerMaestro(enc, filas) {
         nombre casi igual a un hermano, sin fecha, etc.).
      6. Si hay una decisión de revisión (Aprobar / No aprobar), esa manda.
    ===================================================================== */
-function procesar(datos, decisiones, fechaEntregaIso) {
+function procesar(datos, decisiones, fechaEntregaIso, manuales = {}) {
   const corte = aMs(fechaEntregaIso) ?? aMs(CONFIG.fechaEntregaPorDefecto);
   const minNac = aMs(CONFIG.nacidosDesde);
   const maestro = new Map(datos.maestro.map((m) => [m.ced, m]));
@@ -848,8 +863,42 @@ function procesar(datos, decisiones, fechaEntregaIso) {
     for (const { r, h } of anteriores.values()) agregar(r, h, 'anterior');
   }
 
+  // --- 4.1b Niños agregados a mano (inscripciones tardías que llegan por WhatsApp, correo, etc.)
+  // Traen la edad en vez de la fecha de nacimiento. Pasan por las mismas reglas de maestro y repetidos.
+  const sedesMaestro = [...new Set(datos.maestro.map((m) => m.sede))];
+  const sedeParecida = (s) => { const n = normTxt(s); if (!n) return ''; return sedesMaestro.find((x) => normTxt(x) === n) || sedesMaestro.find((x) => normTxt(x).includes(n) || n.includes(normTxt(x))) || ''; };
+  for (const [id, a] of Object.entries(manuales || {})) {
+    if (!a || a.borrado) continue;
+    const ced = soloDigitos(a.ced);
+    const m = maestro.get(ced);
+    const enMaestro = !!m && m.retiro == null;
+    const edad = a.edad === '' || a.edad == null || !Number.isFinite(+a.edad) ? null : Math.floor(+a.edad);
+    if (!colaboradores.has(ced)) colaboradores.set(ced, { ced, enMaestro, m, ultima: { correo: '', nombre: a.colaborador || '' }, respuestas: 0, nombre: m ? m.nombre : a.colaborador, sede: enMaestro ? m.sede : a.sede });
+    const creado = Date.parse(a.creado || a.fecha || '') || null;
+    ninos.push({
+      key: `manual|${id}`, ced, cedDigitada: a.ced,
+      colaborador: nombrePropio(m ? m.nombre : a.colaborador), nombreForms: a.colaborador || '',
+      sede: enMaestro ? m.sede : (sedeParecida(a.sede) || texto(a.sede).toUpperCase() || 'SIN SEDE'), sedeForms: a.sede || '',
+      cargo: m ? m.cargo : '', celular: m ? m.celular : '', correo: '',
+      enMaestro, retiroMs: m?.retiro ?? null,
+      nino: nombrePropio(a.nino), genero: a.genero || '', g: generoCorto(a.genero),
+      tipoDoc: '', doc: soloDigitos(a.doc), docDigitado: a.doc || '',
+      nacMs: null, nacRaw: '', edad, rango: edad != null && edad >= 0 && edad <= CONFIG.edadMax ? rangoDe(edad) : null,
+      foto: '', respId: null, respFin: creado, primeraVez: Number.MAX_SAFE_INTEGER, // si ya estaba por el Forms, gana el Forms
+      origen: 'manual', manual: a, numHijo: 0,
+      revisar: [], rechazo: null, estadoBase: '', estado: '', decision: null,
+    });
+  }
+
   // --- 4.2 Edad, documento y datos básicos
   for (const k of ninos) {
+    if (k.origen === 'manual') { // agregado a mano: se confía en la edad que escribió Gestión Humana
+      if (k.edad == null) k.revisar.push('Falta la edad');
+      else if (k.edad > CONFIG.edadMax) k.rechazo = `Tiene ${k.edad} años: no cumple la edad`;
+      if (!k.nino) k.revisar.push('Falta el nombre del niño');
+      if (k.g === 'O') k.revisar.push('Falta el género');
+      continue;
+    }
     if (k.nacMs == null) k.revisar.push('Fecha de nacimiento vacía o no válida' + (k.nacRaw ? ` ("${k.nacRaw}")` : ''));
     else if (k.nacMs < minNac) k.rechazo = `Nació antes del 01/01/2016 (${fmtFecha(k.nacMs)}): no cumple la edad`;
     else if (k.nacMs > corte) k.revisar.push(`Fecha de nacimiento (${fmtFecha(k.nacMs)}) posterior a la fecha de entrega`);
@@ -1021,13 +1070,13 @@ async function abrirJsonRevisiones(textoJson, clave) {
   try { j = JSON.parse(textoJson); } catch (e) { throw new Error('El archivo no es un JSON válido.'); }
   if (j.tipo !== 'regalos-navidad-revisiones') throw new Error('Este JSON no es un archivo de revisiones de esta herramienta.');
   // Devuelve { decisiones, compras } (los archivos viejos no traen compras)
-  if (!j.cifrado) return { decisiones: j.decisiones || {}, compras: j.compras || null, datos: j.datos || null, fechaEntrega: j.fechaEntrega || null };
+  if (!j.cifrado) return { decisiones: j.decisiones || {}, compras: j.compras || null, datos: j.datos || null, fechaEntrega: j.fechaEntrega || null, manuales: j.manuales || {} };
   if (!clave) { const e = new Error('Este archivo tiene clave.'); e.necesitaClave = true; throw e; }
   try {
     const llave = await derivarLlave(clave, deB64(j.salt), j.iter || CONFIG.iteracionesClave);
     const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64(j.iv) }, llave, deB64(j.datos));
     const cuerpo = JSON.parse(dec.decode(plano));
-    return { decisiones: cuerpo.decisiones || {}, compras: cuerpo.compras || null, datos: cuerpo.datos || null, fechaEntrega: cuerpo.fechaEntrega || null };
+    return { decisiones: cuerpo.decisiones || {}, compras: cuerpo.compras || null, datos: cuerpo.datos || null, fechaEntrega: cuerpo.fechaEntrega || null, manuales: cuerpo.manuales || {} };
   } catch (e) {
     const err = new Error('La clave no es correcta.'); err.necesitaClave = true; err.claveMala = true; throw err;
   }
@@ -1088,7 +1137,7 @@ function fusionarEstado(local, remoto) {
   const datos = !local.datos ? (r.datos || null) : (r.datos && (r.datos.fecha || '') > (local.datos.fecha || '') ? r.datos : local.datos);
   const compras = r.compras && r.compras.catalogo && (r.compras.fecha || '') > (local.compras?.fecha || '') ? { ...comprasIniciales(), ...r.compras } : local.compras;
   const fechaEntrega = datos === local.datos ? local.fechaEntrega : (r.fechaEntrega || local.fechaEntrega);
-  return { datos, compras, fechaEntrega, decisiones: fusionarDecisiones(local.decisiones, r.decisiones).decisiones };
+  return { datos, compras, fechaEntrega, decisiones: fusionarDecisiones(local.decisiones, r.decisiones).decisiones, manuales: fusionarDecisiones(local.manuales || {}, r.manuales || {}).decisiones };
 }
 
 const GH_POR_DEFECTO = { token: '', repo: 'FelipeAnali/Jueguete', rama: 'respaldos', ruta: `respaldos/regalos${CONFIG.anio}.json`, recordarClave: true, clave: '' };
@@ -1268,12 +1317,13 @@ const C_UI = {
     render: (k) => <>{k.colaborador || 'Sin nombre'}<span className="sub">CC {k.ced}</span><span className="sub">{k.sede}</span></> },
   nino: { id: 'ninoUI', label: 'Niño(a)', excel: false, wrap: true, orden: (k) => k.nino,
     valor: (k) => `${k.nino} ${k.doc}`,
-    render: (k) => <>{k.nino || <i>Sin nombre</i>}<span className="sub">Doc {k.doc || 'sin documento'}</span><span className="sub">{(fmtFecha(k.nacMs) || k.nacRaw || 'Sin fecha')}{k.edad != null ? `, ${plural(k.edad, 'año', 'años')}` : ''}</span></> },
+    render: (k) => <>{k.nino || <i>Sin nombre</i>}<span className="sub">Doc {k.doc || 'sin documento'}</span><span className="sub">{k.origen === 'manual' ? 'Agregado a mano' : (fmtFecha(k.nacMs) || k.nacRaw || 'Sin fecha')}{k.edad != null ? `, ${plural(k.edad, 'año', 'años')}` : ''}</span></> },
 };
 const soloExcel = (cols) => cols.map((c) => ({ ...c, ui: false }));
 const COLS_APROBADOS = [C.sede, C.ced, C.colaborador, C.cargo, C.nino, C.doc, C.tipoDoc, C.genero, C.nac, C.edad, C.rango, C.sedeForms, C.respId, C.fin, ...COLS_REVISION];
 const COLS_REVISAR = [C_UI.colab, C_UI.nino, ...soloExcel([C.sede, C.ced, C.colaborador, C.nino, C.doc, C.genero, C.nac, C.edad]), C.motivo, C.foto, C.correo, C.celular, C.respId, C.fin, ...COLS_REVISION];
 const COLS_RETIRADOS = [C_UI.colab, C_UI.nino, ...soloExcel([C.sede, C.ced, C.colaborador, C.nino, C.doc, C.genero, C.nac, C.edad]), C.sugerencia, C.correo, C.foto, C.respId, C.fin, ...COLS_REVISION];
+const COLS_MANUALES = [C_UI.colab, C_UI.nino, ...soloExcel([C.sede, C.ced, C.colaborador, C.nino, C.doc, C.edad]), C.genero, C.rango];
 const COLS_RECHAZADOS = [C_UI.colab, C_UI.nino, ...soloExcel([C.sede, C.ced, C.colaborador, C.nino, C.doc, C.genero, C.nac, C.edad]), C.motivo, C.foto, C.respId, C.fin, ...COLS_REVISION];
 const COLS_SIN = [
   { id: 'sede', label: 'Sede', valor: (m) => m.sede },
@@ -1506,18 +1556,18 @@ function descargarBytes(bytes, nombre, tipo) {
 const PRESUPUESTO_BASE = 50000000;
 // Catálogo inicial (archivo juguetes_1.xlsx). edadMin/edadMax: edades del catálogo.
 const CATALOGO_BASE = [
-  { codigo: '42051', nombre: 'Coche de erizo', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 69920 },
+  { codigo: '42051', nombre: 'Coche de erizo', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 69920, genero: 'Unisex' },
   { codigo: '38766', nombre: 'Primeros bloques', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 42920 },
   { codigo: '45112', nombre: 'Primer kit médico', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 69930 },
-  { codigo: '34915', nombre: 'Mini balde', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 31920 },
-  { codigo: '43975', nombre: 'Play-Doh confitería', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 55920 },
+  { codigo: '34915', nombre: 'Mini balde', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 31920, genero: 'Masculino' },
+  { codigo: '43975', nombre: 'Play-Doh confitería', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 55920, genero: 'Femenino' },
   { codigo: '45539', nombre: 'Mesa proyector Uninex', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 55920 },
-  { codigo: '43730', nombre: 'Juego el tiburón pirata', edadTxt: '4 a 6', edadMin: 4, edadMax: 6, precio: 69920 },
+  { codigo: '43730', nombre: 'Juego el tiburón pirata', edadTxt: '4 a 6', edadMin: 4, edadMax: 6, precio: 69920, genero: 'Unisex' },
   { codigo: '41878', nombre: 'Adivina quién', edadTxt: '4 a 6', edadMin: 4, edadMax: 6, precio: 87920 },
-  { codigo: '23099', nombre: 'Monopolio Tío Rico', edadTxt: '7 a 9', edadMin: 7, edadMax: 9, precio: 59920 },
+  { codigo: '23099', nombre: 'Monopolio Tío Rico', edadTxt: '7 a 9', edadMin: 7, edadMax: 9, precio: 59920, genero: 'Unisex' },
   { codigo: '43948', nombre: 'Conecta', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 64930 },
   { codigo: '43729', nombre: 'Juego Rummy', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 39920 },
-  { codigo: '28500', nombre: 'Bop It', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 67920 },
+  { codigo: '28500', nombre: 'Bop It', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 67920, genero: 'Unisex' },
 ];
 const comprasIniciales = () => ({ total: PRESUPUESTO_BASE, pct: 100, incluirPendientes: false, catalogo: CATALOGO_BASE, plan: {}, fecha: '' });
 
@@ -1648,7 +1698,7 @@ function calcularPresupuesto(ninosBase, compras) {
         sirve: g.sirven.some((x) => x.codigo === p.codigo) }; // false si el juguete no es para esta edad
     });
     return {
-      ...g, n, F: ks.filter((k) => k.g === 'F').length, M: ks.filter((k) => k.g === 'M').length,
+      ...g, n, ninos: ks, F: ks.filter((k) => k.g === 'F').length, M: ks.filter((k) => k.g === 'M').length,
       plata, porNino: n ? plata / n : 0, sugerencia, filasPlan,
       unidades: filasPlan.reduce((s, x) => s + x.cantidad, 0),
       costo: filasPlan.reduce((s, x) => s + x.subtotal, 0),
@@ -1678,6 +1728,137 @@ function calcularPresupuesto(ninosBase, compras) {
     fueraDeEdad: grupos.flatMap((g) => g.filasPlan.filter((f) => !f.sirve && f.cantidad > 0).map((f) => ({ g, f }))),
     hayPlan: grupos.some((g) => g.filasPlan.length),
   };
+}
+
+// Género de un juguete: 'F', 'M' o null (unisex)
+const generoJuguete = (t) => { const n = normTxt(t?.genero); return n.startsWith('fem') ? 'F' : n.startsWith('mas') ? 'M' : null; };
+const etiquetaJuguete = (t) => `${t.nombre}${generoJuguete(t) ? ` (${generoJuguete(t) === 'F' ? 'niña' : 'niño'})` : ''}`;
+
+/* Lee el PEDIDO FINAL en el formato de Toy Park (FP- Pedido TPS): Código, Descripcion,
+   Edad, Genero, Cantidad y Valor IVA Incluido. Devuelve un juguete por fila con su cantidad. */
+async function leerPedidoExcel(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  for (const nombreHoja of wb.SheetNames) {
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], { header: 1, raw: true, defval: null, blankrows: true });
+    for (let f = 0; f < Math.min(60, filas.length); f++) {
+      const enc = (filas[f] || []).map(normTxt);
+      const cCod = enc.findIndex((h) => h.startsWith('codigo'));
+      const cDesc = enc.findIndex((h) => h.startsWith('descripcion'));
+      const cCant = enc.findIndex((h) => h.startsWith('cantidad'));
+      if (cCod < 0 || cDesc < 0 || cCant < 0) continue;
+      const cEdad = enc.findIndex((h) => h.startsWith('edad'));
+      const cGen = enc.findIndex((h) => h.startsWith('genero'));
+      let cPrecio = enc.findIndex((h) => h.startsWith('valor iva incluido'));
+      if (cPrecio < 0) cPrecio = enc.findIndex((h) => h.startsWith('precio'));
+      const out = [];
+      for (const fila of filas.slice(f + 1)) {
+        const nombre = texto(fila[cDesc]);
+        const cantidad = Math.round(Number(fila[cCant]));
+        if (!nombre || /ejemplo/i.test(nombre)) continue;
+        if (!Number.isFinite(cantidad) || cantidad <= 0) continue;
+        const edadRaw = cEdad >= 0 ? texto(fila[cEdad]) : '';
+        const edad = /beb/i.test(edadRaw) ? { edadMin: 0, edadMax: 0, edadTxt: '0' } : edadCatalogo(edadRaw);
+        if (!edad) throw new Error(`No entendí la edad "${edadRaw}" del juguete "${nombre}".`);
+        out.push({
+          codigo: texto(fila[cCod]), nombre: nombre.charAt(0).toLocaleUpperCase('es') + nombre.slice(1),
+          precio: Math.round(Number(String(cPrecio >= 0 ? fila[cPrecio] ?? '' : '').replace(/[^\d.]/g, ''))) || 0,
+          genero: cGen >= 0 ? (texto(fila[cGen]) || 'Unisex') : 'Unisex', cantidad, ...edad,
+        });
+      }
+      if (out.length) return out;
+    }
+  }
+  throw new Error('No encontré el pedido en ese Excel. Debe tener el formato de Toy Park (columnas Código, Descripcion, Edad, Genero y Cantidad).');
+}
+// Junta el pedido con el catálogo (por código o por nombre) y arma el plan de compra con sus cantidades.
+// ninosDe(g) dice cuántos niños hay en cada grupo de edad, para repartir un juguete que sirve a varios grupos.
+function aplicarPedido(compras, items, contarGrupo) {
+  const catalogo = compras.catalogo.map((t) => ({ ...t }));
+  for (const it of items) {
+    const i = catalogo.findIndex((t) => t.codigo === it.codigo || normTxt(t.nombre) === normTxt(it.nombre));
+    const { cantidad, ...t } = it;
+    if (i >= 0) catalogo[i] = { ...catalogo[i], ...t, precio: t.precio || catalogo[i].precio };
+    else catalogo.push(t);
+  }
+  const grupos = armarGruposEdad(catalogo);
+  const plan = {};
+  for (const it of items) {
+    const t = catalogo.find((x) => x.codigo === it.codigo || normTxt(x.nombre) === normTxt(it.nombre));
+    const gs = grupos.filter((g) => g.sirven.some((x) => x.codigo === t.codigo));
+    if (!gs.length) continue;
+    // Reparto proporcional a los niños de cada grupo (casi siempre es un solo grupo)
+    const ns = gs.map(contarGrupo), tot = ns.reduce((a, b) => a + b, 0);
+    let resto = it.cantidad;
+    gs.forEach((g, i) => {
+      const q = i === gs.length - 1 ? resto : Math.round(it.cantidad * (tot ? ns[i] / tot : 1 / gs.length));
+      resto -= q;
+      if (q > 0) (plan[g.id] = plan[g.id] || []).push({ codigo: t.codigo, cantidad: q });
+    });
+  }
+  return { catalogo, plan };
+}
+
+/* Reparte los juguetes del plan entre los niños: cada niño recibe uno de SU edad y,
+   si el juguete es de niña o de niño, de su género. Orden: primero los inscritos en el
+   Forms por orden de inscripción y al final los agregados a mano. Si faltan juguetes,
+   quedan "sin juguete"; si sobran, quedan como sobrantes. */
+function asignarJuguetes(P) {
+  const porNino = new Map();
+  const sinJuguete = [];
+  const sobrantes = new Map();
+  let fueraGenero = 0;
+  for (const g of P.grupos) {
+    const lista = (P.hayPlan ? g.filasPlan.map((f) => ({ t: f.juguete, q: f.cantidad })) : g.sugerencia.items.map((x) => ({ t: P.porCodigo.get(x.codigo), q: x.cantidad })))
+      .filter((x) => x.t && x.q > 0).map((x) => ({ ...x, gen: generoJuguete(x.t) }));
+    const ks = [...(g.ninos || [])].sort((a, b) => (a.origen === 'manual') - (b.origen === 'manual') || (a.respFin ?? 0) - (b.respFin ?? 0) || a.key.localeCompare(b.key));
+    const libres = [];
+    const dar = (k, x, fuera) => { porNino.set(k.key, { t: x.t, fueraGenero: !!fuera }); x.q--; if (fuera) fueraGenero++; };
+    for (const k of ks) { const x = lista.find((y) => y.gen && y.gen === k.g && y.q > 0); if (x) dar(k, x); else libres.push(k); }
+    const libres2 = [];
+    for (const k of libres) { const x = lista.find((y) => !y.gen && y.q > 0); if (x) dar(k, x); else libres2.push(k); }
+    for (const k of libres2) { const x = lista.find((y) => y.q > 0); if (x) dar(k, x, true); else sinJuguete.push(k); }
+    for (const x of lista) if (x.q > 0) sobrantes.set(x.t.codigo, { t: x.t, q: (sobrantes.get(x.t.codigo)?.q || 0) + x.q });
+  }
+  return { porNino, sinJuguete, sobrantes: [...sobrantes.values()], fueraGenero };
+}
+// Tabla sede x juguete
+function distribucionPorSede(P, A) {
+  const juguetes = new Map();
+  const sedes = new Map();
+  for (const g of P.grupos) for (const k of g.ninos || []) {
+    const a = A.porNino.get(k.key);
+    if (!sedes.has(k.sede)) sedes.set(k.sede, { sede: k.sede, porCod: new Map(), total: 0, sin: 0 });
+    const s = sedes.get(k.sede);
+    if (!a) { s.sin++; continue; }
+    juguetes.set(a.t.codigo, a.t);
+    s.porCod.set(a.t.codigo, (s.porCod.get(a.t.codigo) || 0) + 1);
+    s.total++;
+  }
+  const js = [...juguetes.values()].sort((a, b) => a.edadMin - b.edadMin || a.edadMax - b.edadMax || a.nombre.localeCompare(b.nombre, 'es'));
+  const filas = [...sedes.values()].sort((a, b) => a.sede.localeCompare(b.sede, 'es'));
+  return { juguetes: js, filas };
+}
+function filasProveedorMatriz(D, A) {
+  const enc = ['Sede (PDV)', ...D.juguetes.map((t) => `${t.codigo} ${t.nombre} · ${t.edadMax === 0 ? 'Bebés' : t.edadTxt + ' años'} · ${t.genero || 'Unisex'}`), 'Total juguetes'];
+  const out = [enc];
+  for (const f of D.filas) out.push([f.sede, ...D.juguetes.map((t) => f.porCod.get(t.codigo) || 0), f.total]);
+  out.push(['TOTAL', ...D.juguetes.map((t) => D.filas.reduce((a, f) => a + (f.porCod.get(t.codigo) || 0), 0)), D.filas.reduce((a, f) => a + f.total, 0)]);
+  if (A.sobrantes.length) out.push(['Sobran (sin asignar)', ...D.juguetes.map((t) => A.sobrantes.find((x) => x.t.codigo === t.codigo)?.q || 0), A.sobrantes.reduce((a, x) => a + x.q, 0)]);
+  return out;
+}
+function filasProveedorLista(D) {
+  const out = [['Sede (PDV)', 'Código', 'Juguete', 'Edad', 'Género', 'Cantidad']];
+  for (const f of D.filas) for (const t of D.juguetes) { const q = f.porCod.get(t.codigo); if (q) out.push([f.sede, t.codigo, t.nombre, t.edadMax === 0 ? 'Bebés' : `${t.edadTxt} años`, t.genero || 'Unisex', q]); }
+  return out;
+}
+function filasDetalleNinos(P, A) {
+  const out = [['Sede', 'Cédula', 'Colaborador', 'Niño(a)', 'Edad', 'Género', 'Código juguete', 'Juguete', 'Nota']];
+  const ks = P.grupos.flatMap((g) => g.ninos || []).sort((a, b) => a.sede.localeCompare(b.sede, 'es') || a.colaborador.localeCompare(b.colaborador, 'es'));
+  for (const k of ks) {
+    const a = A.porNino.get(k.key);
+    out.push([k.sede, k.ced, k.colaborador, k.nino, k.edad ?? '', k.genero, a ? a.t.codigo : '', a ? a.t.nombre : 'SIN JUGUETE (faltan unidades)', [a?.fueraGenero ? 'Juguete de otro género (no alcanzó el de su género)' : '', k.origen === 'manual' ? 'Agregado a mano' : ''].filter(Boolean).join(' · ')]);
+  }
+  return out;
 }
 
 // Filas para el Excel
@@ -1964,7 +2145,9 @@ const VISTAS = [
   { id: 'retirados', label: 'No están en el maestro', color: 'var(--warn)' },
   { id: 'rechazados', label: 'Rechazados', color: 'var(--bad)' },
   { id: 'sin', label: 'Sin inscribir', color: 'var(--muted)' },
+  { id: 'manuales', label: 'Agregados a mano', color: 'var(--tint)' },
   { id: 'presupuesto', label: 'Presupuesto y compra', color: 'var(--lime)' },
+  { id: 'sedes', label: 'Entrega por sede', color: 'var(--lime)' },
   { id: 'descargas', label: 'Descargas', color: 'var(--tint)' },
 ];
 
@@ -1979,6 +2162,7 @@ function App() {
   const [sede, setSede] = useState('');                   // '' = todas las sedes
   const [vista, setVista] = useState('resumen');
   const [decisiones, setDecisiones] = useState({});       // revisiones (se guardan solas en este equipo y en la copia de GitHub)
+  const [manuales, setManuales] = useState({});           // niños agregados a mano: id -> { colaborador, ced, nino, edad, genero, sede, doc, fecha }
   const [sinGuardar, setSinGuardar] = useState(0);        // cuántas revisiones no se han descargado
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState('');
@@ -2001,25 +2185,26 @@ function App() {
   const aplicarEstado = (e) => {
     if (e.datos !== undefined) setDatos(e.datos);
     if (e.decisiones) setDecisiones(e.decisiones);
+    if (e.manuales) setManuales(e.manuales);
     if (e.compras && e.compras.catalogo) setCompras({ ...comprasIniciales(), ...e.compras });
     if (e.fechaEntrega) setFechaEntrega(e.fechaEntrega);
   };
   useEffect(() => {
     pedirAlmacenamientoPersistente();
     idbLeer('estado').then((g) => {
-      if (g) aplicarEstado({ datos: g.datos || null, decisiones: g.decisiones || {}, compras: g.compras, fechaEntrega: g.fechaEntrega });
+      if (g) aplicarEstado({ datos: g.datos || null, decisiones: g.decisiones || {}, manuales: g.manuales || {}, compras: g.compras, fechaEntrega: g.fechaEntrega });
       setCargadoLocal(true);
     });
   }, []);
   useEffect(() => {
     if (!cargadoLocal) return;
     const t = setTimeout(() => {
-      idbGuardar('estado', { datos, decisiones, compras, fechaEntrega, guardado: new Date().toISOString() })
+      idbGuardar('estado', { datos, decisiones, manuales, compras, fechaEntrega, guardado: new Date().toISOString() })
         .then(() => setGuardadoLocal(new Date().toISOString()))
         .catch(() => setGuardadoLocal('error'));
     }, 400);
     return () => clearTimeout(t);
-  }, [cargadoLocal, datos, decisiones, compras, fechaEntrega]);
+  }, [cargadoLocal, datos, decisiones, manuales, compras, fechaEntrega]);
 
   // ---------- Copia en GitHub
   const [gh, setGh] = useState(() => { try { return { ...GH_POR_DEFECTO, ...JSON.parse(leerLocal('regalos2026.github', '{}')) }; } catch (e) { return { ...GH_POR_DEFECTO }; } });
@@ -2029,8 +2214,8 @@ function App() {
   const shaNube = useRef(null);       // versión de la copia que ya conocemos
   const ultimoSubido = useRef('');    // contenido (sin cifrar) que ya está igual en GitHub
   const estadoRef = useRef({});
-  estadoRef.current = { datos, decisiones, compras, fechaEntrega };
-  const textoEstado = (e) => JSON.stringify([e.datos || null, e.decisiones || {}, e.compras || null, e.fechaEntrega || null]);
+  estadoRef.current = { datos, decisiones, manuales, compras, fechaEntrega };
+  const textoEstado = (e) => JSON.stringify([e.datos || null, e.decisiones || {}, e.compras || null, e.fechaEntrega || null, e.manuales || {}]);
   const enCurso = useRef(false);
 
   // Trae la copia de GitHub y la junta con lo de aquí. Devuelve el estado juntado.
@@ -2042,13 +2227,13 @@ function App() {
     shaNube.current = remota.sha;
     if (textoEstado(junto) !== textoEstado(estadoRef.current)) { estadoRef.current = junto; aplicarEstado(junto); }
     // Si lo de aquí no trae nada nuevo, no hace falta volver a subir
-    const remotoNorm = { datos: abierto.datos, decisiones: abierto.decisiones, compras: abierto.compras && abierto.compras.catalogo ? { ...comprasIniciales(), ...abierto.compras } : null, fechaEntrega: abierto.fechaEntrega };
+    const remotoNorm = { datos: abierto.datos, decisiones: abierto.decisiones, manuales: abierto.manuales, compras: abierto.compras && abierto.compras.catalogo ? { ...comprasIniciales(), ...abierto.compras } : null, fechaEntrega: abierto.fechaEntrega };
     if (textoEstado(junto) === textoEstado(remotoNorm)) ultimoSubido.current = textoEstado(junto);
     return { estado: junto, existe: true };
   };
   const subirNube = async (forzar = false) => {
     if (!nubeActiva || enCurso.current) return;
-    if (!estadoRef.current.datos && !Object.keys(estadoRef.current.decisiones || {}).length) return; // nada que respaldar todavía
+    if (!estadoRef.current.datos && !Object.keys(estadoRef.current.decisiones || {}).length && !Object.keys(estadoRef.current.manuales || {}).length) return; // nada que respaldar todavía
     if (!forzar && textoEstado(estadoRef.current) === ultimoSubido.current) { setNube((n) => ({ ...n, estado: 'ok' })); return; }
     enCurso.current = true;
     setNube((n) => ({ ...n, estado: 'subiendo', msg: '' }));
@@ -2056,7 +2241,7 @@ function App() {
       for (let intento = 0; intento < 3; intento++) {
         const { estado: e } = await bajarNube(); // primero se juntan los cambios de los demás
         if (!forzar && textoEstado(e) === ultimoSubido.current) { setNube({ estado: 'ok', fecha: new Date().toISOString(), msg: '' }); break; }
-        const txt = await armarJsonRevisiones(e.decisiones, claveNube, revisor, e.compras, { datos: e.datos, fechaEntrega: e.fechaEntrega });
+        const txt = await armarJsonRevisiones(e.decisiones, claveNube, revisor, e.compras, { datos: e.datos, fechaEntrega: e.fechaEntrega, manuales: e.manuales || {} });
         try {
           shaNube.current = await ghEscribir(gh, txt, shaNube.current);
           ultimoSubido.current = textoEstado(e);
@@ -2092,7 +2277,7 @@ function App() {
     setNube((n) => (n.estado === 'error' || n.estado === 'subiendo' ? n : { ...n, estado: 'pendiente' }));
     const t = setTimeout(() => subirNube(), 6000);
     return () => clearTimeout(t);
-  }, [cargadoLocal, nubeActiva, datos, decisiones, compras, fechaEntrega, nube.estado === 'ok']);
+  }, [cargadoLocal, nubeActiva, datos, decisiones, manuales, compras, fechaEntrega, nube.estado === 'ok']);
   // Revisa cada 2 minutos si otra persona subió cambios
   useEffect(() => {
     if (!nubeActiva) return;
@@ -2139,7 +2324,7 @@ function App() {
 
   const datosActivos = useMemo(() => (fuenteDev === 'real' ? datos : generarDev(fuenteDev)), [fuenteDev, datos]);
   const listo = datosActivos && datosActivos.respuestas && datosActivos.maestro;
-  const modelo = useMemo(() => (listo ? procesar(datosActivos, decisiones, fechaEntrega) : null), [listo, datosActivos, decisiones, fechaEntrega]);
+  const modelo = useMemo(() => (listo ? procesar(datosActivos, decisiones, fechaEntrega, fuenteDev === 'real' ? manuales : {}) : null), [listo, datosActivos, decisiones, fechaEntrega, manuales, fuenteDev]);
   useEffect(() => { if (modelo && sede && !modelo.sedes.includes(sede)) setSede(''); }, [modelo, sede]);
 
   // Listas filtradas por la sede escogida
@@ -2202,12 +2387,31 @@ function App() {
       else { nuevo.maestro.forEach((m) => porCed.set(m.ced, m)); maestro = [...porCed.values()]; }
       const nuevosDatos = { respuestas: datos?.respuestas || null, maestro, archivos: [...(datos?.archivos || []).filter((a) => !nuevo.archivos.includes(a)), ...nuevo.archivos], fecha: new Date().toISOString() };
       // Cuántos niños que "no estaban en el maestro" ahora sí están
-      const fuera = (d) => (d.respuestas && d.maestro ? procesar(d, decisiones, fechaEntrega).ninos.filter((k) => k.estadoBase === 'retirado').length : null);
+      const fuera = (d) => (d.respuestas && d.maestro ? procesar(d, decisiones, fechaEntrega, manuales).ninos.filter((k) => k.estadoBase === 'retirado').length : null);
       const fueraAntes = datos ? fuera(datos) : null, fueraDespues = fuera(nuevosDatos);
       setDatos(nuevosDatos); setFuenteDev('real');
       setModal({ tipo: 'maestro-ok', resumen: { modo, total: maestro.length, activos: maestro.filter((m) => m.retiro == null).length, nuevas, actualizadas, quitadas: modo === 'reemplazar' ? antes.filter((m) => !nuevo.maestro.some((x) => x.ced === m.ced)).length : 0, fueraAntes, fueraDespues } });
     } catch (e) { setError(e.message || String(e)); setModal(null); }
     setOcupado('');
+  };
+
+  // ---------- Niños agregados a mano
+  const agregarManuales = (filas, por) => {
+    const fecha = new Date().toISOString();
+    setManuales((prev) => {
+      const out = { ...prev };
+      filas.forEach((f, i) => { out[`m${Date.now().toString(36)}${i}${Math.random().toString(36).slice(2, 6)}`] = { ...f, por, creado: fecha, fecha }; });
+      return out;
+    });
+    if (por) { setRevisor(por); guardarLocal('regalos2026.revisor', por); }
+    setModal(null);
+    setToast(`${plural(filas.length, 'niño agregado', 'niños agregados')}`);
+  };
+  const quitarManual = (k) => {
+    if (!window.confirm(`¿Quitar a ${k.nino || 'este niño'} de la lista? Se puede volver a agregar.`)) return;
+    const id = k.key.replace(/^manual\|/, '');
+    setManuales((prev) => ({ ...prev, [id]: { ...prev[id], borrado: true, fecha: new Date().toISOString() } }));
+    setToast('Niño quitado');
   };
 
   // ---------- Revisiones
@@ -2272,6 +2476,18 @@ function App() {
   const ninosPresupuesto = useMemo(() => (modelo ? modelo.ninos.filter((k) => k.estado === 'aprobado'
     || (compras.incluirPendientes && !k.decision && (k.estadoBase === 'revisar' || k.estadoBase === 'retirado'))) : []), [modelo, compras.incluirPendientes]);
   const P = useMemo(() => calcularPresupuesto(ninosPresupuesto, compras), [ninosPresupuesto, compras]);
+  const asignacion = useMemo(() => asignarJuguetes(P), [P]);
+  const cargarPedido = async (file) => {
+    setError(''); setOcupado('Leyendo el pedido…');
+    try {
+      const items = await leerPedidoExcel(file);
+      const contar = (g) => ninosPresupuesto.filter((k) => k.rango && k.edad != null && k.rango.id === g.rango.id && k.edad >= g.desde && k.edad <= g.hasta).length;
+      const { catalogo, plan } = aplicarPedido(compras, items, contar);
+      cambiarCompras({ catalogo, plan });
+      setToast(`Pedido cargado: ${plural(items.length, 'juguete', 'juguetes')}, ${fmtNum(items.reduce((a, x) => a + x.cantidad, 0))} unidades`);
+    } catch (e) { setError(e.message || String(e)); }
+    setOcupado('');
+  };
   const descargarPedido = async () => {
     setOcupado('Llenando el formato de Toy Park…');
     try {
@@ -2352,7 +2568,7 @@ function App() {
     );
   }
 
-  const cuentas = { aprobados: L.aprobados.length, revisar: L.revisar.length, retirados: L.retirados.length, rechazados: L.rechazados.length, sin: L.sin.length };
+  const cuentas = { manuales: modelo.ninos.filter((k) => k.origen === 'manual' && (!sede || k.sede === sede)).length, aprobados: L.aprobados.length, revisar: L.revisar.length, retirados: L.retirados.length, rechazados: L.rechazados.length, sin: L.sin.length };
 
   return (
     <>
@@ -2463,8 +2679,30 @@ function App() {
             </Seccion>
           )}
 
+          {vista === 'manuales' && (
+            <Seccion titulo="Agregados a mano" texto="Niños que llegaron tarde (por WhatsApp, correo o en persona) y no están en el Forms. Pasan por las mismas reglas: si la cédula no está en el maestro o el niño ya estaba inscrito, se marca.">
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ tipo: 'agregar' })}>Agregar niños</button>
+              </div>
+              <Tabla filas={modelo.ninos.filter((k) => k.origen === 'manual' && (!sede || k.sede === sede))} columnas={COLS_MANUALES} filaClave={(k) => k.key}
+                vacio={['Todavía no hay niños agregados a mano', 'Usa “Agregar niños” para escribirlos o pegarlos desde un Excel.']}
+                extra={[
+                  { id: 'est', label: 'Estado', render: (k) => <span className={'pill ' + (k.estado === 'aprobado' ? 'pill-ok' : k.estado === 'rechazado' ? 'pill-bad' : 'pill-warn')} title={motivoEstado(k)}>{k.estado === 'aprobado' ? 'Aprobado' : k.estado === 'rechazado' ? (k.duplicadoDe ? 'Repetido' : 'Rechazado') : k.estado === 'retirado' ? 'No está en el maestro' : 'Por revisar'}</span> },
+                  { id: 'x', label: '', render: (k) => <button className="btn-link" onClick={() => quitarManual(k)}>Quitar</button> },
+                ]}
+                onDescargar={() => descargarLibro([{ nombre: 'Agregados a mano', ws: hojaDesde(modelo.ninos.filter((k) => k.origen === 'manual'), [C.sede, C.ced, C.colaborador, C.nino, C.doc, C.genero, C.edad, C.rango, C.motivo]) }], `Regalos${CONFIG.anio}_agregados_a_mano_${hoyIso()}.xlsx`)} />
+            </Seccion>
+          )}
+
+          {vista === 'sedes' && <VistaSedes P={P} A={asignacion} sedeSel={sede} onExcel={(tipo) => {
+            const D = distribucionPorSede(P, asignacion);
+            if (tipo === 'proveedor') descargarLibro([{ nombre: 'Por sede', ws: hojaTabla(filasProveedorMatriz(D, asignacion)) }, { nombre: 'Lista por sede', ws: hojaTabla(filasProveedorLista(D)) }], `Toy_Park_distribucion_por_sede_${CONFIG.anio}_${hoyIso()}.xlsx`);
+            else descargarLibro([{ nombre: 'Juguete por niño', ws: hojaTabla(filasDetalleNinos(P, asignacion)) }], `Regalos${CONFIG.anio}_juguete_por_nino_${hoyIso()}.xlsx`);
+            setToast('Excel descargado');
+          }} onPedido={descargarPedido} setVista={setVista} />}
+
           {vista === 'presupuesto' && <VistaPresupuesto P={P} compras={compras} cambiarCompras={cambiarCompras}
-            onExcel={() => descargarHojas(['plan', 'estimado'])} onPedido={descargarPedido} setToast={setToast} setError={setError} />}
+            onExcel={() => descargarHojas(['plan', 'estimado'])} onPedido={descargarPedido} onCargarPedido={cargarPedido} setToast={setToast} setError={setError} />}
 
           {vista === 'descargas' && <VistaDescargas hojas={hojasDisponibles} sedeActual={sede} sedes={modelo.sedes} nombreSede={nombreSede}
             aprobadosPorSede={(s) => modelo.ninos.filter((k) => k.estado === 'aprobado' && (!s || k.sede === s)).length}
@@ -2472,6 +2710,7 @@ function App() {
         </main>
       </div>
 
+      {modal?.tipo === 'agregar' && <ModalAgregar maestro={datosActivos.maestro} sedes={modelo.sedes} revisor={revisor} onCancelar={() => setModal(null)} onGuardar={agregarManuales} />}
       {modal?.tipo === 'decision-masiva' && <ModalDecisionMasiva {...modal} revisor={revisor} onCancelar={() => setModal(null)} onGuardar={guardarDecisionMasiva} />}
       {modal?.tipo === 'decision' && <ModalDecision {...modal} revisor={revisor} onCancelar={() => setModal(null)} onGuardar={guardarDecision} />}
       {modal?.tipo === 'github' && <ModalGithub gh={gh} clave={claveNube} onCancelar={() => setModal(null)} onGuardar={guardarConfigGh} onDesconectar={desconectarGh} onBorrar={borrarEsteEquipo} />}
@@ -2636,8 +2875,9 @@ function VistaDescargas({ hojas, sedeActual, sedes, nombreSede, aprobadosPorSede
    Arriba: cuánto hay y cuánto se usa. Luego el plan real (lo que ustedes
    escogen) contra el estimado (reparto proporcional + sugerencia).
    Al final, el catálogo de juguetes. */
-function VistaPresupuesto({ P, compras, cambiarCompras, onExcel, onPedido, setToast, setError }) {
+function VistaPresupuesto({ P, compras, cambiarCompras, onExcel, onPedido, onCargarPedido, setToast, setError }) {
   const inputCat = useRef(null);
+  const inputPedido = useRef(null);
 
   // El plan se guarda por grupo de edad: plan["1-3:1-3"] = [{ codigo, cantidad }]
   // (con el catálogo actual cada rango es un solo grupo; si un catálogo nuevo trae otras
@@ -2669,6 +2909,8 @@ function VistaPresupuesto({ P, compras, cambiarCompras, onExcel, onPedido, setTo
           <p>Cuántos juguetes comprar con la plata que hay. Cada niño recibe un juguete de SU edad según el catálogo. Cuenta los niños aprobados de todas las sedes, con la edad a la fecha de entrega.</p>
         </div>
         <div className="row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-sm" onClick={() => inputPedido.current.click()} title="Sube el pedido final (formato Toy Park con cantidades): actualiza el catálogo, el género de cada juguete y el plan de compra">Cargar pedido final</button>
+          <input ref={inputPedido} type="file" accept=".xlsx,.xls" hidden onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; if (f && (!P.hayPlan || window.confirm('El pedido reemplaza el plan de compra actual. ¿Seguir?'))) onCargarPedido(f); }} />
           <button className="btn btn-primary btn-sm" onClick={onPedido} title="Descarga el formato FP- Pedido TPS 2026 de Toy Park ya lleno con el plan de compra">Llenar formato Toy Park</button>
           <button className="btn btn-ghost btn-sm" onClick={onExcel}>Descargar plan en Excel</button>
         </div>
@@ -2898,7 +3140,7 @@ function GrupoPlan({ g, filasGuardadas, P, onCambiar, unico }) {
           <div className="plan-row" key={f.i}>
             <select aria-label="Juguete" value={f.codigo} onChange={(e) => cambiarFila(f.i, { codigo: e.target.value })} className={f.sirve ? '' : 'mal'}>
               {!f.sirve && <option value={f.codigo}>{f.juguete ? `${f.juguete.nombre} (no es para esta edad)` : '(no está en el catálogo)'}</option>}
-              {opciones.map((t) => <option key={t.codigo} value={t.codigo} disabled={enOtras.has(t.codigo)}>{t.nombre}, {fmtCOP(t.precio)}</option>)}
+              {opciones.map((t) => <option key={t.codigo} value={t.codigo} disabled={enOtras.has(t.codigo)}>{etiquetaJuguete(t)}, {fmtCOP(t.precio)}</option>)}
             </select>
             <input aria-label="Cantidad" type="number" min="0" step="1" value={f.cantidad || ''} placeholder="0"
               onChange={(e) => cambiarFila(f.i, { cantidad: Math.max(0, Math.floor(+e.target.value || 0)) })} />
@@ -2935,11 +3177,11 @@ function Seccion({ titulo, texto, children }) {
   return (<><div className="page-head"><div><h1>{titulo}</h1><p>{texto}</p></div></div>{children}</>);
 }
 function Ocupado({ texto }) { return <div className="busy" role="status"><div><div className="spinner" />{texto}</div></div>; }
-function Modal({ titulo, texto, onCerrar, children }) {
+function Modal({ titulo, texto, onCerrar, children, ancho }) {
   useEffect(() => { const h = (e) => e.key === 'Escape' && onCerrar(); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onCerrar]);
   return (
     <div className="backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={titulo}>
+      <div className={'modal' + (ancho ? ' modal-ancho' : '')} role="dialog" aria-modal="true" aria-label={titulo}>
         <h2>{titulo}</h2>{texto && <p>{texto}</p>}{children}
       </div>
     </div>
@@ -3112,6 +3354,166 @@ function ModalMaestroOk({ r, onCerrar, onVer }) {
     </Modal>
   );
 }
+/* ---------- Agregar niños a mano (uno por uno, pegando desde Excel o subiendo un Excel) ---------- */
+const FILA_VACIA = () => ({ ced: '', colaborador: '', nino: '', edad: '', genero: '', sede: '', doc: '' });
+const edadDeTexto = (v) => { const t = normTxt(v); if (!t) return ''; if (/mes/.test(t) && !/ano/.test(t)) return '0'; const m = t.match(/\d+/); return m ? String(+m[0]) : ''; };
+const generoDeTexto = (v) => { const t = normTxt(v); return /^(f|nina|mujer)/.test(t) ? 'Femenino' : /^(m|nino|hombre|var)/.test(t) ? 'Masculino' : ''; };
+// Convierte filas (arreglos) en niños; detecta encabezados si los hay
+function filasANinos(filas) {
+  filas = filas.filter((f) => f && f.some((x) => texto(x)));
+  if (!filas.length) return [];
+  const enc = filas[0].map(normTxt);
+  const busca = (pred) => enc.findIndex(pred);
+  let c = {
+    colaborador: busca((h) => h.includes('colaborador') || h === 'nombre del empleado' || h === 'nombre empleado'),
+    ced: busca((h) => h === 'cc' || h.startsWith('cedula') || h === 'c.c.' || h === 'c.c' || h === 'documento colaborador' || h === 'numero de documento'),
+    nino: busca((h) => (h.includes('nino') || h.includes('hijo')) && !h.includes('documento') && !h.includes('edad')),
+    edad: busca((h) => h.startsWith('edad')),
+    sede: busca((h) => h.startsWith('sede') || h.startsWith('descripcion c.o') || h === 'pdv'),
+    genero: busca((h) => h.startsWith('genero') || h.startsWith('sexo')),
+    doc: busca((h) => h.includes('documento') && (h.includes('nino') || h.includes('hijo')) || h.includes('registro civil') || h.includes('tarjeta')),
+  };
+  let datos = filas.slice(1);
+  if (c.ced < 0 || c.nino < 0) { // sin encabezados: el orden de la tabla de WhatsApp
+    c = { colaborador: 0, ced: 1, nino: 2, edad: 3, sede: 4, genero: 5, doc: 6 }; datos = filas;
+  }
+  const v = (f, i) => (i >= 0 ? texto(f[i]) : '');
+  return datos.map((f) => ({ colaborador: v(f, c.colaborador), ced: soloDigitos(v(f, c.ced)), nino: v(f, c.nino), edad: edadDeTexto(v(f, c.edad)), sede: v(f, c.sede), genero: generoDeTexto(v(f, c.genero)), doc: soloDigitos(v(f, c.doc)) }))
+    .filter((r) => r.ced || r.nino);
+}
+function ModalAgregar({ maestro, sedes, revisor, onCancelar, onGuardar }) {
+  const [filas, setFilas] = useState(() => [FILA_VACIA(), FILA_VACIA(), FILA_VACIA()]);
+  const [por, setPor] = useState(revisor || '');
+  const [pegando, setPegando] = useState(false);
+  const [err, setErr] = useState('');
+  const inputX = useRef(null);
+  const porCed = useMemo(() => new Map((maestro || []).map((m) => [m.ced, m])), [maestro]);
+  const cambiar = (i, campo, valor) => setFilas((fs) => fs.map((f, j) => {
+    if (j !== i) return f;
+    const n = { ...f, [campo]: valor };
+    if (campo === 'ced') { const m = porCed.get(soloDigitos(valor)); if (m) { n.colaborador = nombrePropio(m.nombre); n.sede = m.sede; } }
+    return n;
+  }));
+  const ponerFilas = (nuevas) => {
+    if (!nuevas.length) { setErr('No encontré niños en lo que pegaste. Revisa que tenga cédula y nombre del niño.'); return; }
+    setErr('');
+    const completas = nuevas.map((r) => { const m = porCed.get(r.ced); return m ? { ...r, colaborador: nombrePropio(m.nombre), sede: m.sede } : r; });
+    setFilas((fs) => [...fs.filter((f) => Object.values(f).some(Boolean)), ...completas]);
+    setPegando(false);
+  };
+  const subirExcel = async (file) => {
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      ponerFilas(filasANinos(XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: '' })));
+    } catch (e) { setErr('No pude leer ese Excel.'); }
+  };
+  const usadas = filas.filter((f) => Object.values(f).some(Boolean));
+  const listas = usadas.filter((f) => f.ced && f.nino && f.edad !== '' && f.genero);
+  const faltan = usadas.length - listas.length;
+  return (
+    <Modal ancho titulo="Agregar niños" texto="Para inscripciones que llegaron tarde. Escribe la cédula del colaborador y la página trae su nombre y sede del maestro. Puedes pegar la tabla desde Excel o subir el archivo." onCerrar={onCancelar}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        <button className="btn btn-sm" onClick={() => setPegando((x) => !x)}>Pegar desde Excel</button>
+        <button className="btn btn-sm" onClick={() => inputX.current.click()}>Subir Excel</button>
+        <input ref={inputX} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; if (f) subirExcel(f); }} />
+      </div>
+      {pegando && (
+        <div className="form-row">
+          <label htmlFor="pegar">Copia las filas en Excel (con o sin encabezados) y pégalas aquí</label>
+          <textarea id="pegar" className="pegar" autoFocus placeholder={'NOMBRE COLABORADOR\tCC\tNOMBRE NIÑO(A)\tEDAD\tSEDE\tGÉNERO'}
+            onPaste={(e) => { e.preventDefault(); ponerFilas(filasANinos(e.clipboardData.getData('text').split(/\r?\n/).map((l) => l.split('\t')))); }} />
+          <p className="hint">El orden sin encabezados es: colaborador, cédula, niño, edad, sede, género (opcional), documento (opcional).</p>
+        </div>
+      )}
+      {err && <div className="alert alert-bad" role="alert">{err}</div>}
+      <div className="tabla-agregar-wrap">
+        <table className="tabla-agregar">
+          <thead><tr><th style={{ width: '15%' }}>Cédula colaborador</th><th style={{ width: '20%' }}>Colaborador</th><th style={{ width: '20%' }}>Niño(a)</th><th style={{ width: '7%' }}>Edad</th><th style={{ width: '12%' }}>Género</th><th style={{ width: '14%' }}>Sede</th><th style={{ width: '12%' }}>Doc. niño (opcional)</th><th /></tr></thead>
+          <tbody>
+            {filas.map((f, i) => {
+              const m = f.ced ? porCed.get(soloDigitos(f.ced)) : null;
+              return (
+                <tr key={i}>
+                  <td><input value={f.ced} inputMode="numeric" onChange={(e) => cambiar(i, 'ced', e.target.value)} aria-label="Cédula del colaborador" />
+                    {f.ced && <span className={'ayuda ' + (m && m.retiro == null ? 'ok' : 'mal')}>{m ? (m.retiro == null ? 'Está en el maestro' : 'Retirado en el maestro') : 'No está en el maestro'}</span>}</td>
+                  <td><input value={f.colaborador} onChange={(e) => cambiar(i, 'colaborador', e.target.value)} aria-label="Nombre del colaborador" /></td>
+                  <td><input value={f.nino} onChange={(e) => cambiar(i, 'nino', e.target.value)} aria-label="Nombre del niño" /></td>
+                  <td><input value={f.edad} inputMode="numeric" onChange={(e) => cambiar(i, 'edad', edadDeTexto(e.target.value) || '')} aria-label="Edad en años" /></td>
+                  <td><select value={f.genero} onChange={(e) => cambiar(i, 'genero', e.target.value)} aria-label="Género">
+                    <option value="">Escoger</option><option>Femenino</option><option>Masculino</option></select></td>
+                  <td><input value={f.sede} list="sedes-lista" onChange={(e) => cambiar(i, 'sede', e.target.value)} aria-label="Sede" /></td>
+                  <td><input value={f.doc} inputMode="numeric" onChange={(e) => cambiar(i, 'doc', soloDigitos(e.target.value))} aria-label="Documento del niño" /></td>
+                  <td><button className="btn-link" onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))} aria-label="Quitar fila">✕</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <datalist id="sedes-lista">{(sedes || []).map((x) => <option key={x} value={x} />)}</datalist>
+      </div>
+      <button className="btn btn-sm" onClick={() => setFilas((fs) => [...fs, FILA_VACIA()])}>+ Otra fila</button>
+      <div className="form-row" style={{ marginTop: 14 }}><label htmlFor="por-a">Tu nombre</label><input id="por-a" type="text" value={por} onChange={(e) => setPor(e.target.value)} maxLength={60} placeholder="Quién agrega" /></div>
+      {faltan > 0 && <p className="hint" style={{ color: 'var(--warn)' }}>{plural(faltan, 'fila está incompleta', 'filas están incompletas')}: faltan cédula, nombre del niño, edad o género. No se agregan hasta completarlas.</p>}
+      <div className="modal-actions">
+        <button className="btn" onClick={onCancelar}>Cancelar</button>
+        <button className="btn btn-primary" disabled={!listas.length || !por.trim()} onClick={() => onGuardar(listas.map((f) => ({ ...f, ced: soloDigitos(f.ced), colaborador: texto(f.colaborador), nino: texto(f.nino), sede: texto(f.sede), edad: f.edad })), por.trim())}>
+          {listas.length ? `Agregar ${plural(listas.length, 'niño', 'niños')}` : 'Agregar'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ---------- Entrega por sede: cuántos juguetes de cada uno van a cada PDV ---------- */
+function VistaSedes({ P, A, sedeSel, onExcel, onPedido, setVista }) {
+  const D = useMemo(() => distribucionPorSede(P, A), [P, A]);
+  const filas = D.filas.filter((f) => !sedeSel || f.sede === sedeSel);
+  const totCod = (t) => filas.reduce((a, f) => a + (f.porCod.get(t.codigo) || 0), 0);
+  const sinPorSede = D.filas.filter((f) => f.sin > 0);
+  const sobran = A.sobrantes.reduce((a, x) => a + x.q, 0);
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Entrega por sede</h1>
+          <p>Cuántos juguetes de cada referencia van a cada punto de venta, para que el proveedor los entregue separados por PDV. Cada niño recibe un juguete de su edad y, si el juguete es de niña o de niño, de su género. Sale del plan de compra{P.hayPlan ? '' : ' (todavía no hay plan: se usa la sugerencia)'}.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-primary btn-sm" onClick={() => onExcel('proveedor')} disabled={!D.juguetes.length}>Excel para el proveedor</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => onExcel('detalle')} disabled={!D.juguetes.length} title="Lista interna con el juguete de cada niño (tiene datos personales: no se envía al proveedor)">Juguete por niño (interno)</button>
+        </div>
+      </div>
+      {A.sinJuguete.length > 0 && (
+        <div className="alert alert-warn" role="status">
+          <b>Faltan {plural(A.sinJuguete.length, 'juguete', 'juguetes')}:</b> {plural(A.sinJuguete.length, 'niño aprobado queda', 'niños aprobados quedan')} sin juguete con las cantidades del plan ({sinPorSede.map((f) => `${f.sede}: ${f.sin}`).join(', ')}).
+          {' '}Suma unidades en <button className="btn-link" onClick={() => setVista('presupuesto')}>Presupuesto y compra</button> y vuelve a llenar el formato de Toy Park.
+        </div>
+      )}
+      {A.fueraGenero > 0 && <div className="alert alert-warn" role="status">{plural(A.fueraGenero, 'niño recibe', 'niños reciben')} un juguete marcado para el otro género porque no alcanzó el de su género.</div>}
+      {sobran > 0 && <div className="alert" style={{ background: 'var(--surface-2)' }}>Sobran {plural(sobran, 'juguete', 'juguetes')} sin asignar ({A.sobrantes.map((x) => `${x.q} ${x.t.nombre}`).join(', ')}). Quedan para casos que lleguen tarde.</div>}
+      {!D.juguetes.length ? (
+        <div className="table-wrap"><div className="empty"><b>Todavía no hay juguetes para repartir</b>Carga el pedido final o arma el plan en Presupuesto y compra.</div></div>
+      ) : (
+        <div className="table-wrap">
+          <table className="matriz">
+            <thead><tr><th>Sede (PDV)</th>{D.juguetes.map((t) => <th key={t.codigo} className="num" title={`${t.codigo} · ${t.genero || 'Unisex'}`}>{t.nombre}<span className="sub">{t.edadMax === 0 ? 'Bebés' : `${t.edadTxt} años`}{generoJuguete(t) ? ` · ${t.genero}` : ''}</span></th>)}<th className="num">Total</th></tr></thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f.sede}><td>{f.sede}{f.sin > 0 && <span className="sub" style={{ color: 'var(--warn)' }}>{plural(f.sin, 'niño sin juguete', 'niños sin juguete')}</span>}</td>
+                  {D.juguetes.map((t) => <td key={t.codigo} className="num">{f.porCod.get(t.codigo) || <span className="sub" style={{ display: 'inline' }}>·</span>}</td>)}
+                  <td className="num"><b>{fmtNum(f.total)}</b></td></tr>
+              ))}
+            </tbody>
+            <tfoot><tr><td>{sedeSel ? 'Total sede' : 'Total'}</td>{D.juguetes.map((t) => <td key={t.codigo} className="num">{fmtNum(totCod(t))}</td>)}<td className="num">{fmtNum(filas.reduce((a, f) => a + f.total, 0))}</td></tr></tfoot>
+          </table>
+        </div>
+      )}
+      <p className="hint" style={{ marginTop: 12 }}>El “Excel para el proveedor” trae solo cantidades por sede (sin nombres de niños). El de “Juguete por niño” es para armar las bolsas aquí y tiene datos personales.</p>
+    </>
+  );
+}
+
 function AbrirConClave({ onAbrir }) {
   const [c, setC] = useState('');
   const [err, setErr] = useState('');
