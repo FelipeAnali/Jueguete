@@ -1135,7 +1135,7 @@ function pedirAlmacenamientoPersistente() { try { navigator.storage?.persist?.()
 function fusionarEstado(local, remoto) {
   const r = remoto || {};
   const datos = !local.datos ? (r.datos || null) : (r.datos && (r.datos.fecha || '') > (local.datos.fecha || '') ? r.datos : local.datos);
-  const compras = r.compras && r.compras.catalogo && (r.compras.fecha || '') > (local.compras?.fecha || '') ? { ...comprasIniciales(), ...r.compras } : local.compras;
+  const compras = r.compras && r.compras.catalogo && (r.compras.fecha || '') > (local.compras?.fecha || '') ? normCompras(r.compras) : local.compras;
   const fechaEntrega = datos === local.datos ? local.fechaEntrega : (r.fechaEntrega || local.fechaEntrega);
   return { datos, compras, fechaEntrega, decisiones: fusionarDecisiones(local.decisiones, r.decisiones).decisiones, manuales: fusionarDecisiones(local.manuales || {}, r.manuales || {}).decisiones };
 }
@@ -1555,21 +1555,33 @@ function descargarBytes(bytes, nombre, tipo) {
    ===================================================================== */
 const PRESUPUESTO_BASE = 50000000;
 // Catálogo inicial (archivo juguetes_1.xlsx). edadMin/edadMax: edades del catálogo.
+// PEDIDO FINAL a Toy Park (PI SCAÑAVERAL, 3 nov. 2026): estos son los 6 productos que se compran.
+// Cantidades = las del PI (678) + 7 inscripciones tardías (6 del WhatsApp y la niña de Diana, Country)
+// = 685 regalos. El plan de compra arranca con estas cantidades.
 const CATALOGO_BASE = [
-  { codigo: '42051', nombre: 'Coche de erizo', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 69920, genero: 'Unisex' },
-  { codigo: '38766', nombre: 'Primeros bloques', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 42920 },
-  { codigo: '45112', nombre: 'Primer kit médico', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 69930 },
+  { codigo: '42152', nombre: 'Coche de erizo', edadTxt: '0', edadMin: 0, edadMax: 0, precio: 69920, genero: 'Unisex' },
   { codigo: '34915', nombre: 'Mini balde', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 31920, genero: 'Masculino' },
   { codigo: '43975', nombre: 'Play-Doh confitería', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 55920, genero: 'Femenino' },
-  { codigo: '45539', nombre: 'Mesa proyector Uninex', edadTxt: '1 a 3', edadMin: 1, edadMax: 3, precio: 55920 },
   { codigo: '43730', nombre: 'Juego el tiburón pirata', edadTxt: '4 a 6', edadMin: 4, edadMax: 6, precio: 69920, genero: 'Unisex' },
-  { codigo: '41878', nombre: 'Adivina quién', edadTxt: '4 a 6', edadMin: 4, edadMax: 6, precio: 87920 },
   { codigo: '23099', nombre: 'Monopolio Tío Rico', edadTxt: '7 a 9', edadMin: 7, edadMax: 9, precio: 59920, genero: 'Unisex' },
-  { codigo: '43948', nombre: 'Conecta', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 64930 },
-  { codigo: '43729', nombre: 'Juego Rummy', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 39920 },
   { codigo: '28500', nombre: 'Bop It', edadTxt: '10', edadMin: 10, edadMax: 10, precio: 67920, genero: 'Unisex' },
 ];
-const comprasIniciales = () => ({ total: PRESUPUESTO_BASE, pct: 100, incluirPendientes: false, catalogo: CATALOGO_BASE, plan: {}, fecha: '' });
+const CANTIDADES_PEDIDO = { '42152': 44, '34915': 78, '43975': 71, '43730': 179, '23099': 224, '28500': 89 }; // total 685
+const TOTAL_REGALOS = 685;
+const PEDIDO_VERSION = 'PI-2026-11-03-685';
+// Plan de compra del pedido final: cada juguete va al grupo de edad que le corresponde
+function planPedidoBase() {
+  const plan = {};
+  for (const g of armarGruposEdad(CATALOGO_BASE)) {
+    const filas = g.sirven.filter((t) => CANTIDADES_PEDIDO[t.codigo]).map((t) => ({ codigo: t.codigo, cantidad: CANTIDADES_PEDIDO[t.codigo] }));
+    if (filas.length) plan[g.id] = filas;
+  }
+  return plan;
+}
+const comprasIniciales = () => ({ total: PRESUPUESTO_BASE, pct: 100, incluirPendientes: false, catalogo: CATALOGO_BASE, plan: planPedidoBase(), fecha: '', pedidoVersion: PEDIDO_VERSION });
+// Lo guardado antes del pedido final (catálogo de 12 juguetes) se pasa al pedido final una sola vez
+const normCompras = (c) => (c && c.pedidoVersion === PEDIDO_VERSION ? { ...comprasIniciales(), ...c }
+  : { ...comprasIniciales(), ...(c || {}), catalogo: CATALOGO_BASE, plan: planPedidoBase(), pedidoVersion: PEDIDO_VERSION });
 
 const fmtCOP = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.round(n || 0));
 
@@ -2171,7 +2183,7 @@ function App() {
   const [revisor, setRevisor] = useState(() => leerLocal('regalos2026.revisor', '')); // solo el nombre de quien revisa
   // Presupuesto, catálogo y plan de compra. No tiene datos personales, así que se guarda en el navegador.
   const [compras, setCompras] = useState(() => {
-    try { const g = JSON.parse(leerLocal('regalos2026.compras', '')); if (g && g.catalogo) return { ...comprasIniciales(), ...g }; } catch (e) { /* nada guardado */ }
+    try { const g = JSON.parse(leerLocal('regalos2026.compras', '')); if (g && g.catalogo) return normCompras(g); } catch (e) { /* nada guardado */ }
     return comprasIniciales();
   });
   const cambiarCompras = (cambio) => setCompras((c) => ({ ...c, ...(typeof cambio === 'function' ? cambio(c) : cambio), fecha: new Date().toISOString() }));
@@ -2186,7 +2198,7 @@ function App() {
     if (e.datos !== undefined) setDatos(e.datos);
     if (e.decisiones) setDecisiones(e.decisiones);
     if (e.manuales) setManuales(e.manuales);
-    if (e.compras && e.compras.catalogo) setCompras({ ...comprasIniciales(), ...e.compras });
+    if (e.compras && e.compras.catalogo) setCompras(normCompras(e.compras));
     if (e.fechaEntrega) setFechaEntrega(e.fechaEntrega);
   };
   useEffect(() => {
@@ -2227,7 +2239,7 @@ function App() {
     shaNube.current = remota.sha;
     if (textoEstado(junto) !== textoEstado(estadoRef.current)) { estadoRef.current = junto; aplicarEstado(junto); }
     // Si lo de aquí no trae nada nuevo, no hace falta volver a subir
-    const remotoNorm = { datos: abierto.datos, decisiones: abierto.decisiones, manuales: abierto.manuales, compras: abierto.compras && abierto.compras.catalogo ? { ...comprasIniciales(), ...abierto.compras } : null, fechaEntrega: abierto.fechaEntrega };
+    const remotoNorm = { datos: abierto.datos, decisiones: abierto.decisiones, manuales: abierto.manuales, compras: abierto.compras && abierto.compras.catalogo ? normCompras(abierto.compras) : null, fechaEntrega: abierto.fechaEntrega };
     if (textoEstado(junto) === textoEstado(remotoNorm)) ultimoSubido.current = textoEstado(junto);
     return { estado: junto, existe: true };
   };
@@ -2449,7 +2461,7 @@ function App() {
         let trajoPlan = false;
         if (abierto.compras && abierto.compras.catalogo) {
           setCompras((c) => {
-            if ((abierto.compras.fecha || '') > (c.fecha || '')) { trajoPlan = true; return { ...comprasIniciales(), ...abierto.compras }; }
+            if ((abierto.compras.fecha || '') > (c.fecha || '')) { trajoPlan = true; return normCompras(abierto.compras); }
             return c;
           });
         }
@@ -3084,7 +3096,7 @@ function VistaPresupuesto({ P, compras, cambiarCompras, onExcel, onPedido, onCar
           <div><h2>Catálogo de juguetes</h2><p>La edad del catálogo decide a qué niños se les puede dar cada juguete. El precio se puede corregir aquí mismo.</p></div>
           <div className="row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-sm" onClick={() => inputCat.current.click()}>Cargar catálogo desde Excel</button>
-            <button className="btn btn-sm btn-ghost" onClick={() => { if (window.confirm('¿Volver al catálogo original? Los precios que cambiaste se pierden.')) cambiarCompras({ catalogo: CATALOGO_BASE }); }}>Catálogo original</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => { if (window.confirm('¿Volver al pedido final (6 juguetes, 685 regalos)? Los cambios al catálogo y al plan se pierden.')) cambiarCompras({ catalogo: CATALOGO_BASE, plan: planPedidoBase() }); }}>Pedido final original</button>
             <input ref={inputCat} type="file" accept=".xlsx,.xlsm,.xls" hidden onChange={(e) => { if (e.target.files[0]) cargarCatalogo(e.target.files[0]); e.target.value = ''; }} />
           </div>
         </div>
@@ -3477,7 +3489,7 @@ function VistaSedes({ P, A, sedeSel, onExcel, onPedido, setVista }) {
       <div className="page-head">
         <div>
           <h1>Entrega por sede</h1>
-          <p>Cuántos juguetes de cada referencia van a cada punto de venta, para que el proveedor los entregue separados por PDV. Cada niño recibe un juguete de su edad y, si el juguete es de niña o de niño, de su género. Sale del plan de compra{P.hayPlan ? '' : ' (todavía no hay plan: se usa la sugerencia)'}.</p>
+          <p>Pedido final: <b>{fmtNum(TOTAL_REGALOS)} regalos</b> en 6 referencias. Cuántos juguetes de cada referencia van a cada punto de venta, para que el proveedor los entregue separados por PDV. Cada niño recibe un juguete de su edad y, si el juguete es de niña o de niño, de su género. Sale del plan de compra{P.hayPlan ? '' : ' (todavía no hay plan: se usa la sugerencia)'}.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={() => onExcel('proveedor')} disabled={!D.juguetes.length}>Excel para el proveedor</button>
